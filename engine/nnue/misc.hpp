@@ -1,0 +1,45 @@
+#include "../includes.hpp"
+#include "../bitboard.hpp"
+
+template<std::size_t MaxSize>
+class IndexList {
+
+   public:
+    std::size_t size() const { return size_; }
+    void        push_back(const T& value) { values_[size_++] = value; }
+    void        clear() { size_ = 0ULL; }
+    int*          begin() { return values_; }
+    int*          end() { return values_ + size_; }
+    const int&    operator[](int index) const { return values_[index]; }
+
+   private:
+    int           values_[MaxSize];
+    std::size_t size_;
+};
+
+PieceType type_of(Piece pc) {
+    return PieceType(pc & 7);
+}
+
+bool color_of(Piece pc) {
+    return (pc ^ 8);
+}
+
+Piece make_piece(bool c, PieceType pt) {
+    return Piece(8*c + pt);
+}
+
+template<int D>
+constexpr Bitboard shift(Bitboard b) {
+    return D == 9     ? (b & ~FileHBits) << 9
+         : D == 7     ? (b & ~FileABits) << 7
+         : D == -7    ? (b & ~FileHBits) >> 7
+         : D == -9    ? (b & ~FileABits) >> 9
+                              : 0;
+}
+
+inline Square pop_lsb(Bitboard& b) {
+    const Square s = Square(_tzcnt_u64(b));
+    b &= b - 1;
+    return s;
+}
