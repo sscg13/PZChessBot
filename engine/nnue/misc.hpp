@@ -1,5 +1,6 @@
 #include "../includes.hpp"
 #include "../bitboard.hpp"
+#include "../movegen.hpp"
 
 template<std::size_t MaxSize>
 class IndexList {
@@ -42,4 +43,25 @@ inline Square pop_lsb(Bitboard& b) {
     const Square s = Square(_tzcnt_u64(b));
     b &= b - 1;
     return s;
+}
+
+Bitboard attacks_bb(PieceType pt, Square sq, Bitboard occ) {
+    switch(pt) {
+        case KNIGHT:
+            return knight_attacks(sq);
+        case BISHOP:
+            return bishop_attacks(sq, occ);
+        case ROOK:
+            return rook_attacks(sq, occ);
+        case QUEEN:
+            return queen_attacks(sq, occ);
+        case KING:
+            return king_attacks(sq);
+        default:
+            return 0;
+    }
+}
+
+Bitboard pawn_attacks_bb(bool color, Square sq) {
+    return pawn_attacks(sq, color);
 }
