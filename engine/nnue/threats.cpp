@@ -143,12 +143,12 @@ template<bool Perspective> void Full_Threats::append_active_psq(const Board& boa
 
 template<bool Perspective> void Full_Threats::append_active_features(const Bitboard *pieceBB, const Piece *board, IndexList<32>& psq, IndexList<96>& threats) {
     Square ksq = lsb(colorBB[Perspective] & pieceBB[KING]);
-    Color order[2][2] = {{WHITE, BLACK}, {BLACK, WHITE}};
+    bool order[2][2] = {{WHITE, BLACK}, {BLACK, WHITE}};
     Bitboard occupied = colorBB[WHITE] | colorBB[BLACK];
     IndexList indices;
     for (int i = WHITE; i <= BLACK; i++) {
         for (int j = PAWN; j <= KING; j++) {
-            Color c = order[Perspective][i];
+            bool c = order[Perspective][i];
             PieceType pt = PieceType(j);
             Piece attkr = make_piece(c, pt);
             Bitboard bb  = colorBB[c] & pieceBB[pt];

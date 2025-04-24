@@ -7,7 +7,7 @@ class IndexList {
 
    public:
     std::size_t size() const { return size_; }
-    void        push_back(const T& value) { values_[size_++] = value; }
+    void        push_back(const int value) { values_[size_++] = value; }
     void        clear() { size_ = 0ULL; }
     int*          begin() { return values_; }
     int*          end() { return values_ + size_; }

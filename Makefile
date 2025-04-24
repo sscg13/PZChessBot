@@ -1,5 +1,5 @@
 EXE ?= pzchessbot
-EVALFILE ?= nnue.bin
+EVALFILE ?= nn-a660a82f6a81.nnue
 
 CXX := g++
 CXXFLAGS := -std=c++17 -march=native -DNNUE_PATH=\"$(EVALFILE)\"

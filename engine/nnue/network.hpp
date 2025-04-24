@@ -11,10 +11,12 @@ constexpr int QB = 64;
 
 struct Accumulator {
     int16_t accumulation[2][HL_SIZE];
-    Bitboard piece_bbs[8];
+    Bitboard occ;
     Piece mailbox[64];
     IndexList<96> threats[2];
+	Square ksq[2];
 
+	template<bool Perspective> void reset(const int16_t* biases);
     template<bool Perspective> void add_weights(const int16_t* weights);
     template<bool Perspective> void sub_weights(const int16_t* weights);
 };
@@ -24,18 +26,15 @@ struct Network {
 	int16_t accumulator_biases[HL_SIZE];
 	int16_t output_weights[NBUCKETS][2 * HL_SIZE];
 	int16_t output_bias[NBUCKETS];
-
-	void load();
-};
-
-
-struct AccumulatorStack {
     Accumulator accumulators[MAX_PLY];
-    Network& network;
     Full_Threats threat_indexer;
     int ply;
 
-    template<bool Perspective> void update_scratch(const Board& board);
-    template<bool Perspective> void update_forwards(const Board& board);
-    int evaluate(int16_t* weights, bool color);
-}
+	void load();
+	void initialize(const Board& board);
+    template<bool Perspective> void update_perspective_scratch(const Board& board);
+    template<bool Perspective> void update_perspective_forward(const Board& board);
+	void update_forward(const Board& board) { update_perspective_forward<WHITE>(board); update_perspective_forward<BLACK>(board); }
+	void update_backward() { ply--; }
+    int32_t evaluate(bool color, int bucket);
+};

@@ -1,10 +1,5 @@
 #include "eval.hpp"
 
-Accumulator w_acc, b_acc;
-Network nnue_network;
-IndexList<96> prev_threats;
-Piece prev_mailbox[64] = {};
-
 #ifdef HCE
 extern Bitboard king_movetable[64];
 
@@ -61,13 +56,7 @@ float multi(int x) {
 
 void init_network() {
 #ifndef HCE
-	nnue_network.load();
-	for (int i = 0; i < HL_SIZE; i++) {
-		w_acc.val[i] = nnue_network.accumulator_biases[i];
-		b_acc.val[i] = nnue_network.accumulator_biases[i];
-	}
-	std::fill(prev_mailbox, prev_mailbox + 64, NO_PIECE);
-	prev_threats.clear();
+	nnue_network->load();
 #endif
 }
 
@@ -243,45 +232,10 @@ Value eval(Board &board) {
 	}
 
 	// Query the NNUE network
-	for (uint16_t i = 0; i < 64; i++) {
-		Piece piece = board.mailbox[i];
-		Piece prev_piece = prev_mailbox[i];
-		if (piece == prev_piece)
-			continue; // No change
-		bool side = piece >> 3; // 1 = black, 0 = white
-		bool prev_side = prev_piece >> 3; // 1 = black, 0 = white
-		PieceType pt = PieceType(piece & 7);
-		PieceType prev_pt = PieceType(prev_piece & 7);
-
-		if (piece != NO_PIECE) {
-			// Add to accumulator
-			uint16_t w_index = calculate_index((Square)i, pt, side, 0);
-			accumulator_add(nnue_network, w_acc, w_index);
-			uint16_t b_index = calculate_index((Square)i, pt, side, 1);
-			accumulator_add(nnue_network, b_acc, b_index);
-		}
-
-		if (prev_piece != NO_PIECE) {
-			// Subtract from accumulator
-			uint16_t w_index = calculate_index((Square)i, prev_pt, prev_side, 0);
-			accumulator_sub(nnue_network, w_acc, w_index);
-			uint16_t b_index = calculate_index((Square)i, prev_pt, prev_side, 1);
-			accumulator_sub(nnue_network, b_acc, b_index);
-		}
-	}
-
-	memcpy(prev_mailbox, board.mailbox, sizeof(prev_mailbox));
-
 	int npieces = _mm_popcnt_u64(board.piece_boards[OCC(WHITE)] | board.piece_boards[OCC(BLACK)]);
-	int nbucket = (npieces - 2) / 4;
+	int bucket = (npieces - 2) / 4;
 
-	int32_t score;
-	if (board.side == WHITE) {
-		score = nnue_eval(nnue_network, w_acc, b_acc, nbucket);
-	} else {
-		score = -nnue_eval(nnue_network, b_acc, w_acc, nbucket);
-	}
-	return score;
+	return nnue_network->evaluate(board.side, bucket);
 }
 
 std::array<Value, 8> debug_eval(Board &board) {
@@ -298,47 +252,9 @@ std::array<Value, 8> debug_eval(Board &board) {
 	}
 
 	// Query the NNUE network
-	for (uint16_t i = 0; i < 64; i++) {
-		Piece piece = board.mailbox[i];
-		Piece prev_piece = prev_mailbox[i];
-		if (piece == prev_piece)
-			continue; // No change
-		bool side = piece >> 3; // 1 = black, 0 = white
-		bool prev_side = prev_piece >> 3; // 1 = black, 0 = white
-		PieceType pt = PieceType(piece & 7);
-		PieceType prev_pt = PieceType(prev_piece & 7);
-
-		if (piece != NO_PIECE) {
-			// Add to accumulator
-			uint16_t w_index = calculate_index((Square)i, pt, side, 0);
-			accumulator_add(nnue_network, w_acc, w_index);
-			uint16_t b_index = calculate_index((Square)i, pt, side, 1);
-			accumulator_add(nnue_network, b_acc, b_index);
-		}
-
-		if (prev_piece != NO_PIECE) {
-			// Subtract from accumulator
-			uint16_t w_index = calculate_index((Square)i, prev_pt, prev_side, 0);
-			accumulator_sub(nnue_network, w_acc, w_index);
-			uint16_t b_index = calculate_index((Square)i, prev_pt, prev_side, 1);
-			accumulator_sub(nnue_network, b_acc, b_index);
-		}
-	}
-
-	memcpy(prev_mailbox, board.mailbox, sizeof(prev_mailbox));
-
-	int npieces = _mm_popcnt_u64(board.piece_boards[OCC(WHITE)] | board.piece_boards[OCC(BLACK)]);
-
 	std::array<Value, 8> score = {};
-	if (board.side == WHITE) {
-		// score = nnue_eval(nnue_network, w_acc, b_acc, nbucket);
-		for (int i = 0; i < 8; i++) {
-			score[i] = nnue_eval(nnue_network, w_acc, b_acc, i);
-		}
-	} else {
-		for (int i = 0; i < 8; i++) {
-			score[i] = -nnue_eval(nnue_network, b_acc, w_acc, i);
-		}
+	for (int i = 0; i < 8; i++) {
+		score[i] = nnue_network->evaluate(board.side, i);
 	}
 	return score;
 }

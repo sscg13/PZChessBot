@@ -118,7 +118,7 @@ Value quiesce(Board &board, Value alpha, Value beta, int side, int depth) {
 	}
 
 	seldepth = std::max(depth, seldepth);
-	Value stand_pat = eval(board) * side;
+	Value stand_pat = eval(board);
 
 	// If it's a mate, stop here since there's no point in searching further
 	if (stand_pat == VALUE_MATE || stand_pat == -VALUE_MATE)
@@ -157,8 +157,10 @@ Value quiesce(Board &board, Value alpha, Value beta, int side, int depth) {
 		// }
 
 		board.make_move(move);
+		nnue_network->update_forward(board);
 		Value score = -quiesce(board, -beta, -alpha, -side, depth + 1);
 		board.unmake_move();
+		nnue_network->update_backward();
 
 		if (score >= VALUE_MATE_MAX_PLY)
 			score = score - (uint16_t(score >> 15) << 1) - 1; // Fixes "mate 0" bug
@@ -284,9 +286,11 @@ Value __recurse(Board &board, int depth, Value alpha = -VALUE_INFINITE, Value be
 		 * are probably Zugzwangs (e.g. endgames).
 		 */
 		board.make_move(NullMove);
+		nnue_network->update_forward(board);
 		// Perform a reduced-depth search
 		Value null_score = -__recurse(board, depth - NMP_R_VALUE, -beta, -beta + 1, -side, pv, ply+1);
 		board.unmake_move();
+		nnue_network->update_backward();
 		if (null_score >= beta)
 			return null_score;
 	}
@@ -320,7 +324,7 @@ Value __recurse(Board &board, int depth, Value alpha = -VALUE_INFINITE, Value be
 		Move &move = scores[i].first;
 		line[ply] = move;
 		board.make_move(move);
-
+		nnue_network->update_forward(board);
 		Value score;
 		if (board.threefold()) {
 			score = 0; // Draw by repetition
@@ -360,7 +364,7 @@ Value __recurse(Board &board, int depth, Value alpha = -VALUE_INFINITE, Value be
 			score = score - (uint16_t(score >> 15) << 1) - 1; // Mate score fix
 
 		board.unmake_move();
-
+		nnue_network->update_backward();
 		if (score > best) {
 			if (score > alpha) {
 				alpha = score;
@@ -428,6 +432,7 @@ std::pair<Move, Value> __search(Board &board, int depth, Value alpha = -VALUE_IN
 		Move &move = scores[i].first;
 		line[0] = move;
 		board.make_move(move);
+		nnue_network->update_forward(board);
 		Value score;
 		if (board.threefold()) {
 			score = 0; // Draw by repetition
@@ -452,7 +457,7 @@ std::pair<Move, Value> __search(Board &board, int depth, Value alpha = -VALUE_IN
 		}
 
 		board.unmake_move();
-
+		nnue_network->update_backward();
 		if (score > best_score) {
 			pvtable[0][0] = move;
 			pvlen[0] = pvlen[1]+1;
@@ -512,7 +517,7 @@ std::pair<Move, Value> search(Board &board, int64_t time, bool quiet) {
 			history[0][i][j] = history[1][i][j] = 0;
 		}
 	}
-
+	nnue_network->initialize(board);
 	Move best_move = NullMove;
 	Value eval = -VALUE_INFINITE;
 	bool aspiration_enabled = true;
@@ -596,7 +601,7 @@ std::pair<Move, Value> search_depth(Board &board, int depth, bool quiet) {
 			history[0][i][j] = history[1][i][j] = 0;
 		}
 	}
-
+	nnue_network->initialize(board);
 	Move best_move = NullMove;
 	Value eval = -VALUE_INFINITE;
 	bool aspiration_enabled = true;
