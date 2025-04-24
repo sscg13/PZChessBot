@@ -16,26 +16,16 @@ void Network::load() {
 	memcpy(&output_bias, ptr, sizeof(output_bias));
 }
 
-int calculate_index(Square sq, PieceType pt, bool side, bool perspective) {
-	if (perspective) {
-		side = !side;
-		sq = (Square)(sq ^ 56);
-	}
-	return side * 64 * 6 + pt * 64 + sq;
+template<bool Perspective> void Accumulator::add_weights(const int16_t* weights) {
+    for (int i = 0; i < HL_SIZE; i++) {
+        accumulation[Perspective][i] += weights[i];
+    }
 }
 
-void accumulator_add(const Network &net, Accumulator &acc, uint16_t index) {
-	// Note: do not need to manually vectorize this, compiler will do it for us
-	for (int i = 0; i < HL_SIZE; i++) {
-		acc.val[i] += net.accumulator_weights[index][i];
-	}
-}
-
-void accumulator_sub(const Network &net, Accumulator &acc, uint16_t index) {
-	// Note: do not need to manually vectorize this, compiler will do it for us
-	for (int i = 0; i < HL_SIZE; i++) {
-		acc.val[i] -= net.accumulator_weights[index][i];
-	}
+template<bool Perspective> void Accumulator::sub_weights(const int16_t* weights) {
+    for (int i = 0; i < HL_SIZE; i++) {
+        accumulation[Perspective][i] -= weights[i];
+    }
 }
 
 int32_t nnue_eval(const Network &net, const Accumulator &stm, const Accumulator &ntm, uint8_t nbucket) {

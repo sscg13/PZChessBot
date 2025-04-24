@@ -3,14 +3,20 @@
 #include "../includes.hpp"
 #include "threats.hpp"
 
-#define HL_SIZE 256
-#define NBUCKETS 8
-#define SCALE 400
-#define QA 255
-#define QB 64
+constexpr int HL_SIZE = 256;
+constexpr int NBUCKETS = 8;
+constexpr int SCALE = 340;
+constexpr int QA = 255;
+constexpr int QB = 64;
 
 struct Accumulator {
-	int16_t val[HL_SIZE] = {};
+    int16_t accumulation[2][HL_SIZE];
+    Bitboard piece_bbs[8];
+    Piece mailbox[64];
+    IndexList<96> threats[2];
+
+    template<bool Perspective> void add_weights(const int16_t* weights);
+    template<bool Perspective> void sub_weights(const int16_t* weights);
 };
 
 struct Network {
@@ -22,10 +28,14 @@ struct Network {
 	void load();
 };
 
-int calculate_index(Square sq, PieceType pt, bool side, bool perspective);
 
-void accumulator_add(const Network &net, Accumulator &acc, uint16_t index);
+struct AccumulatorStack {
+    Accumulator accumulators[MAX_PLY];
+    Network& network;
+    Full_Threats threat_indexer;
+    int ply;
 
-void accumulator_sub(const Network &net, Accumulator &acc, uint16_t index);
-
-int32_t nnue_eval(const Network &net, const Accumulator &stm, const Accumulator &ntm, uint8_t nbucket);
+    template<bool Perspective> void update_scratch(const Board& board);
+    template<bool Perspective> void update_forwards(const Board& board);
+    int evaluate(int16_t* weights, bool color);
+}

@@ -217,33 +217,3 @@ template int Full_Threats::make_psq_index<BLACK>(Piece pc, Square sq, Square ksq
 template std::optional<int> Full_Threats::make_threat_index<WHITE>(Piece attkr, Square from, Square to, Piece attkd, Square ksq);
 template std::optional<int> Full_Threats::make_threat_index<BLACK>(Piece attkr, Square from, Square to, Piece attkd, Square ksq);
 
-// Get a list of indices for recently changed features
-template<bool Perspective> void Full_Threats::append_changed_indices(Square            ksq,
-                                         const DirtyPiece& dp,
-                                         IndexList&        removed,
-                                         IndexList&        added) {
-    for (int i = 0; i < dp.dirty_num; ++i)
-    {
-        if (dp.from[i] != SQ_NONE)
-            removed.push_back(make_psq_index<Perspective>(dp.piece[i], dp.from[i], ksq));
-        if (dp.to[i] != SQ_NONE)
-            added.push_back(make_psq_index<Perspective>(dp.piece[i], dp.to[i], ksq));
-    }
-}
-
-// Explicit template instantiations
-template void Full_Threats::append_changed_indices<WHITE>(Square            ksq,
-                                                         const DirtyPiece& dp,
-                                                         IndexList&        removed,
-                                                         IndexList&        added);
-template void Full_Threats::append_changed_indices<BLACK>(Square            ksq,
-                                                         const DirtyPiece& dp,
-                                                         IndexList&        removed,
-                                                         IndexList&        added);
-
-bool Full_Threats::requires_refresh(const StateInfo* st, Color perspective) {
-    return (st->dirtyPiece.piece[0] == make_piece(perspective, KING)
-    && OrientTBL[perspective][st->dirtyPiece.from[0]] != OrientTBL[perspective][st->dirtyPiece.to[0]]);
-}
-
-

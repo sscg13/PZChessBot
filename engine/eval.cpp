@@ -2,6 +2,7 @@
 
 Accumulator w_acc, b_acc;
 Network nnue_network;
+IndexList<96> prev_threats;
 Piece prev_mailbox[64] = {};
 
 #ifdef HCE
@@ -66,6 +67,7 @@ void init_network() {
 		b_acc.val[i] = nnue_network.accumulator_biases[i];
 	}
 	std::fill(prev_mailbox, prev_mailbox + 64, NO_PIECE);
+	prev_threats.clear();
 #endif
 }
 

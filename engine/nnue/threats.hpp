@@ -84,20 +84,7 @@ class Full_Threats {
 
     template<bool Perspective> void append_active_psq(const Board& board, IndexList<32>& active);
 
-    
-    template<bool Perspective>
-    void append_active_features(const Bitboard *pieceBB, const Piece *mailbox, IndexList<32>& psq, IndexList<96>& threats);
-
-    // Get a list of indices for recently changed features
-    template<bool Perspective>
-    void append_changed_indices(Square ksq, const DirtyPiece& dp, IndexList& removed, IndexList& added);
-
-    /*WIP
-    template<Color Perspective>
-    void append_changed_threats(const StateInfo* st, IndexList& removed, IndexList& added);*/
-    // Returns whether the change stored in this StateInfo means
-    // that a full accumulator refresh is required.
-    static bool requires_refresh(const StateInfo* st, Color perspective);
+    template<bool Perspective> void append_active_features(const Bitboard *pieceBB, const Piece *mailbox, IndexList<32>& psq, IndexList<96>& threats);
 };
 
 #endif  // #ifndef NNUE_FEATURES_FULL_THREATS_INCLUDED
