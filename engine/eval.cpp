@@ -1,5 +1,7 @@
 #include "eval.hpp"
 
+Network* nnue_network = new Network;
+
 #ifdef HCE
 extern Bitboard king_movetable[64];
 
@@ -252,6 +254,7 @@ std::array<Value, 8> debug_eval(Board &board) {
 	}
 
 	// Query the NNUE network
+	nnue_network->initialize(board);
 	std::array<Value, 8> score = {};
 	for (int i = 0; i < 8; i++) {
 		score[i] = nnue_network->evaluate(board.side, i);

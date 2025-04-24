@@ -4,7 +4,6 @@
 #include "nnue/network.hpp"
 #include "includes.hpp"
 
-Network* nnue_network = new Network;
 void init_network();
 
 Value eval(Board &board);

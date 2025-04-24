@@ -2,9 +2,9 @@ EXE ?= pzchessbot
 EVALFILE ?= nn-a660a82f6a81.nnue
 
 CXX := g++
-CXXFLAGS := -std=c++17 -march=native -DNNUE_PATH=\"$(EVALFILE)\"
+CXXFLAGS := -std=c++17 -march=native -static -DNNUE_PATH=\"$(EVALFILE)\"
 RELEASEFLAGS = -O3
-DEBUGFLAGS = -g -fsanitize=address,undefined
+DEBUGFLAGS = -g
 
 SRCS := $(wildcard engine/*.cpp engine/nnue/*.cpp)
 HDRS := $(wildcard engine/*.hpp engine/nnue/*.hpp)

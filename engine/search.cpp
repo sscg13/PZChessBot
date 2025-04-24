@@ -2,6 +2,7 @@
 
 #define MOVENUM(x) ((((#x)[1] - '1') << 12) | (((#x)[0] - 'a') << 8) | (((#x)[3] - '1') << 4) | ((#x)[2] - 'a'))
 
+extern Network* nnue_network;
 uint64_t nodes = 0; // Node count
 int seldepth = 0; // Maximum searched depth, including quiescence search
 uint64_t mx_nodes = 1e18; // Maximum nodes to search

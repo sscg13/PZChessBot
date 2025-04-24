@@ -17,6 +17,7 @@ void Network::load() {
 }
 
 void Network::initialize(const Board& board) {
+	std::cout << "initializing net..." << std::endl;
 	ply = 0;
 	Square whiteksq = Square(_tzcnt_u64(board.piece_boards[WHITE] & board.piece_boards[2+KING]));
 	accumulators[ply].ksq[WHITE] = whiteksq;
@@ -27,6 +28,7 @@ void Network::initialize(const Board& board) {
 	for (int i = 0; i < 64; i++) {
 		accumulators[ply].mailbox[i] = board.mailbox[i];
 	}
+	std::cout << "set up king squares, occupancy, mailbox..." << std::endl;
 	update_perspective_scratch<WHITE>(board);
 	update_perspective_scratch<BLACK>(board);
 }
@@ -51,16 +53,25 @@ template<bool Perspective> void Accumulator::sub_weights(const int16_t* weights)
 
 template<bool Perspective> void Network::update_perspective_scratch(const Board& board) {
 	accumulators[ply].reset<Perspective>(accumulator_biases);
+	std::cout << "reset accumulators..." << std::endl;
 	IndexList<96>& threats = accumulators[ply].threats[Perspective];
 	threats.clear();
 	IndexList<32> psq;
+	psq.clear();
+	std::cout << "preparing psq, threat index lists..." << std::endl;
 	threat_indexer.append_active_features<Perspective>(board.piece_boards, board.mailbox, psq, threats);
+	std::cout << "updating accumulators..." << std::endl;
+	std::cout << "psq features..." << std::endl;
 	for (int index : psq) {
+		std::cout << index << " ";
 		accumulators[ply].add_weights<Perspective>(accumulator_weights[index]);
 	}
+	std::cout << "threat features..." << std::endl;
 	for (int index : threats) {
+		std::cout << index << " ";
 		accumulators[ply].add_weights<Perspective>(accumulator_weights[index]);
 	}
+	std::cout << std::endl << "success" << std::endl;
 }
 
 template<bool Perspective> void Network::update_perspective_forward(const Board& board) {
@@ -73,15 +84,15 @@ template<bool Perspective> void Network::update_perspective_forward(const Board&
 	for (int i = 0; i < 64; i++) {
 		accumulators[ply].mailbox[i] = board.mailbox[i];
 	}
-	if (Full_Threats::OrientTBL[Perspective][ksq] != Full_Threats::OrientTBL[Perspective][ksq]) {
-		update_perspective_scratch(board);
+	if (Full_Threats::OrientTBL[Perspective][ksq] != Full_Threats::OrientTBL[Perspective][oldksq]) {
+		update_perspective_scratch<Perspective>(board);
 	}
 	else {
 		Bitboard prevocc = accumulators[ply-1].occ;
 		Bitboard commonocc = (occ & prevocc);
 		occ ^= commonocc;
 		prevocc ^= commonocc;
-		threat_indexer.append_active_threats(board.piece_boards, board.mailbox, accumulators[ply].threats[Perspective]);
+		threat_indexer.append_active_threats<Perspective>(board.piece_boards, board.mailbox, accumulators[ply].threats[Perspective]);
 		IndexList<96> added;
 		IndexList<96> removed;
 		added.clear();
@@ -99,10 +110,10 @@ template<bool Perspective> void Network::update_perspective_forward(const Board&
 		}
 		accumulators[ply].reset<Perspective>(accumulators[ply-1].accumulation[Perspective]);
 		for (int index : added) {
-			accumulators[ply].add_weights(accumulator_weights[index]);
+			accumulators[ply].add_weights<Perspective>(accumulator_weights[index]);
 		}
 		for (int index : removed) {
-			accumulators[ply].sub_weights(accumulator_weights[index]);
+			accumulators[ply].sub_weights<Perspective>(accumulator_weights[index]);
 		}
 	}
 }
@@ -125,3 +136,14 @@ int32_t Network::evaluate(bool color, int bucket) {
 	score /= QA * QB;
 	return score;
 }
+
+template void Accumulator::reset<WHITE>(const int16_t* biases);
+template void Accumulator::reset<BLACK>(const int16_t* biases);
+template void Accumulator::add_weights<WHITE>(const int16_t* weights);
+template void Accumulator::add_weights<BLACK>(const int16_t* weights);
+template void Accumulator::sub_weights<WHITE>(const int16_t* weights);
+template void Accumulator::sub_weights<BLACK>(const int16_t* weights);
+template void Network::update_perspective_scratch<WHITE>(const Board& board);
+template void Network::update_perspective_scratch<BLACK>(const Board& board);
+template void Network::update_perspective_forward<WHITE>(const Board& board);
+template void Network::update_perspective_forward<BLACK>(const Board& board);
