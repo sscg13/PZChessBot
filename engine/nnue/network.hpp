@@ -34,7 +34,7 @@ struct Network {
 	void initialize(const Board& board);
     template<bool Perspective> void update_perspective_scratch(const Board& board);
     template<bool Perspective> void update_perspective_forward(const Board& board);
-	void update_forward(const Board& board) { update_perspective_forward<WHITE>(board); update_perspective_forward<BLACK>(board); }
+	void update_forward(const Board& board) { ply++; update_perspective_scratch<WHITE>(board); update_perspective_scratch<BLACK>(board); }
 	void update_backward() { ply--; }
     int32_t evaluate(bool color, int bucket);
 };

@@ -63,9 +63,6 @@ template<bool Perspective> std::optional<int> Full_Threats::make_threat_index(Pi
         return std::nullopt;
     }
     Bitboard attacks = (type_of(attkr) == PAWN) ? pawn_attacks_bb(color_of(attkr), from) : attacks_bb(type_of(attkr), from, 0ULL);
-    if (attkr == BLACK_PAWN && from == SQ_B7 && to == SQ_A6 && attkd == BLACK_PAWN && ksq == SQ_B1) {
-        std::cout << " " << threatoffsets[attkr][65] << "+(" << (attkd/8) << "*" << (numvalidtargets[type_of(attkr)]/2) << "+" << map[type_of(attkr)][type_of(attkd)] << ")*" << threatoffsets[attkr][64] << "+" << threatoffsets[attkr][from] << "+" << _mm_popcnt_u64((square_bits(to)-1) & attacks) <<"=";
-    }
     return threatoffsets[attkr][65] + 
         ((attkd/8)*(numvalidtargets[type_of(attkr)]/2)+map[type_of(attkr)][type_of(attkd)])*threatoffsets[attkr][64]
     + threatoffsets[attkr][from] + _mm_popcnt_u64((square_bits(to)-1) & attacks);
