@@ -156,12 +156,12 @@ Value quiesce(Board &board, Value alpha, Value beta, int side, int depth) {
 		// if (see < 0) {
 		// 	continue; // Don't search moves that lose material
 		// }
-
+		PieceChange diff = get_piece_change(board, move);
 		board.make_move(move);
-		//nnue_network->update_forward(board);
+		nnue_network->update_forward(board, diff);
 		Value score = -quiesce(board, -beta, -alpha, -side, depth + 1);
 		board.unmake_move();
-		//nnue_network->update_backward();
+		nnue_network->update_backward();
 
 		if (score >= VALUE_MATE_MAX_PLY)
 			score = score - (uint16_t(score >> 15) << 1) - 1; // Fixes "mate 0" bug
@@ -286,12 +286,13 @@ Value __recurse(Board &board, int depth, Value alpha = -VALUE_INFINITE, Value be
 		 * really no good way of preventing this except for disabling NMP in positions where there
 		 * are probably Zugzwangs (e.g. endgames).
 		 */
+		PieceChange diff = get_piece_change(board, NullMove);
 		board.make_move(NullMove);
-		//nnue_network->update_forward(board);
+		nnue_network->update_forward(board, diff);
 		// Perform a reduced-depth search
 		Value null_score = -__recurse(board, depth - NMP_R_VALUE, -beta, -beta + 1, -side, pv, ply+1);
 		board.unmake_move();
-		//nnue_network->update_backward();
+		nnue_network->update_backward();
 		if (null_score >= beta)
 			return null_score;
 	}
@@ -324,8 +325,9 @@ Value __recurse(Board &board, int depth, Value alpha = -VALUE_INFINITE, Value be
 	for (int i = 0; i < moves.size(); i++) {
 		Move &move = scores[i].first;
 		line[ply] = move;
+		PieceChange diff = get_piece_change(board, move);
 		board.make_move(move);
-		//nnue_network->update_forward(board);
+		nnue_network->update_forward(board, diff);
 		Value score;
 		if (board.threefold()) {
 			score = 0; // Draw by repetition
@@ -365,7 +367,7 @@ Value __recurse(Board &board, int depth, Value alpha = -VALUE_INFINITE, Value be
 			score = score - (uint16_t(score >> 15) << 1) - 1; // Mate score fix
 
 		board.unmake_move();
-		//nnue_network->update_backward();
+		nnue_network->update_backward();
 		if (score > best) {
 			if (score > alpha) {
 				alpha = score;
@@ -432,8 +434,9 @@ std::pair<Move, Value> __search(Board &board, int depth, Value alpha = -VALUE_IN
 	for (int i = 0; i < moves.size(); i++) { // Skip the TT move if it's not legal
 		Move &move = scores[i].first;
 		line[0] = move;
+		PieceChange diff = get_piece_change(board, move);
 		board.make_move(move);
-		//nnue_network->update_forward(board);
+		nnue_network->update_forward(board, diff);
 		Value score;
 		if (board.threefold()) {
 			score = 0; // Draw by repetition
@@ -458,7 +461,7 @@ std::pair<Move, Value> __search(Board &board, int depth, Value alpha = -VALUE_IN
 		}
 
 		board.unmake_move();
-		//nnue_network->update_backward();
+		nnue_network->update_backward();
 		if (score > best_score) {
 			pvtable[0][0] = move;
 			pvlen[0] = pvlen[1]+1;

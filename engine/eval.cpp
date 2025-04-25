@@ -236,7 +236,6 @@ Value eval(Board &board) {
 	// Query the NNUE network
 	int npieces = _mm_popcnt_u64(board.piece_boards[OCC(WHITE)] | board.piece_boards[OCC(BLACK)]);
 	int bucket = (npieces - 2) / 4;
-	nnue_network->initialize(board);
 	return nnue_network->evaluate(board.side, bucket);
 }
 
