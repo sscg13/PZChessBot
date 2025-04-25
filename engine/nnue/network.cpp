@@ -13,22 +13,20 @@ void Network::load() {
 	ptr += sizeof(accumulator_biases);
 	memcpy(output_weights, ptr, sizeof(output_weights));
 	ptr += sizeof(output_weights);
-	memcpy(&output_bias, ptr, sizeof(output_bias));
+	memcpy(output_bias, ptr, sizeof(output_bias));
 }
 
 void Network::initialize(const Board& board) {
-	std::cout << "initializing net..." << std::endl;
 	ply = 0;
-	Square whiteksq = Square(_tzcnt_u64(board.piece_boards[WHITE] & board.piece_boards[2+KING]));
+	Square whiteksq = Square(_tzcnt_u64(board.piece_boards[6+WHITE] & board.piece_boards[KING]));
 	accumulators[ply].ksq[WHITE] = whiteksq;
-	Square blackksq = Square(_tzcnt_u64(board.piece_boards[BLACK] & board.piece_boards[2+KING]));
+	Square blackksq = Square(_tzcnt_u64(board.piece_boards[6+BLACK] & board.piece_boards[KING]));
 	accumulators[ply].ksq[BLACK] = blackksq;
-	Bitboard occ = (board.piece_boards[WHITE] | board.piece_boards[BLACK]);
+	Bitboard occ = (board.piece_boards[6+WHITE] | board.piece_boards[6+BLACK]);
 	accumulators[ply].occ = occ;
 	for (int i = 0; i < 64; i++) {
 		accumulators[ply].mailbox[i] = board.mailbox[i];
 	}
-	std::cout << "set up king squares, occupancy, mailbox..." << std::endl;
 	update_perspective_scratch<WHITE>(board);
 	update_perspective_scratch<BLACK>(board);
 }
@@ -53,36 +51,30 @@ template<bool Perspective> void Accumulator::sub_weights(const int16_t* weights)
 
 template<bool Perspective> void Network::update_perspective_scratch(const Board& board) {
 	accumulators[ply].reset<Perspective>(accumulator_biases);
-	std::cout << "reset accumulators..." << std::endl;
 	IndexList<96>& threats = accumulators[ply].threats[Perspective];
 	threats.clear();
 	IndexList<32> psq;
 	psq.clear();
-	std::cout << "preparing psq, threat index lists..." << std::endl;
 	threat_indexer.append_active_features<Perspective>(board.piece_boards, board.mailbox, psq, threats);
-	std::cout << "updating accumulators..." << std::endl;
-	std::cout << "psq features..." << std::endl;
 	for (int index : psq) {
-		std::cout << index << " ";
 		accumulators[ply].add_weights<Perspective>(accumulator_weights[index]);
 	}
-	std::cout << "threat features..." << std::endl;
 	for (int index : threats) {
-		std::cout << index << " ";
 		accumulators[ply].add_weights<Perspective>(accumulator_weights[index]);
 	}
-	std::cout << std::endl << "success" << std::endl;
 }
 
 template<bool Perspective> void Network::update_perspective_forward(const Board& board) {
-	Square ksq = Square(_tzcnt_u64(board.piece_boards[Perspective] & board.piece_boards[2+KING]));
+	Square ksq = Square(_tzcnt_u64(board.piece_boards[6+Perspective] & board.piece_boards[KING]));
 	Square oldksq = accumulators[ply].ksq[Perspective];
 	ply++;
 	accumulators[ply].ksq[Perspective] = ksq;
-	Bitboard occ = (board.piece_boards[WHITE] | board.piece_boards[BLACK]);
-	accumulators[ply].occ = occ;
-	for (int i = 0; i < 64; i++) {
-		accumulators[ply].mailbox[i] = board.mailbox[i];
+	Bitboard occ = (board.piece_boards[6+WHITE] | board.piece_boards[6+BLACK]);
+	if (Perspective) {
+		accumulators[ply].occ = occ;
+		for (int i = 0; i < 64; i++) {
+			accumulators[ply].mailbox[i] = board.mailbox[i];
+		}
 	}
 	if (Full_Threats::OrientTBL[Perspective][ksq] != Full_Threats::OrientTBL[Perspective][oldksq]) {
 		update_perspective_scratch<Perspective>(board);
@@ -125,9 +117,10 @@ int32_t Network::evaluate(bool color, int bucket) {
 		int input = std::clamp((int)accumulators[ply].accumulation[color][i], 0, QA);
 		int weight = input * output_weights[bucket][i];
 		score += input * weight;
-
-		input = std::clamp((int)accumulators[ply].accumulation[!color][i], 0, QA);
-		weight = input * output_weights[bucket][HL_SIZE + i];
+	}
+	for (int i = 0; i < HL_SIZE; i++) {
+		int input = std::clamp((int)accumulators[ply].accumulation[!color][i], 0, QA);
+		int weight = input * output_weights[bucket][HL_SIZE + i];
 		score += input * weight;
 	}
 	score /= QA;

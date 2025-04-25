@@ -43,13 +43,12 @@ void Full_Threats::init_threat_offsets() {
                 }
             }
             threatoffsets[piece][64] = squareoffset;
-            pieceoffset += numvalidtargets[piece]*squareoffset;
+            pieceoffset += numvalidtargets[piecetbl[piece]]*squareoffset;
         }
     }
 }
 template<bool Perspective> int Full_Threats::make_psq_index(Piece pc, Square sq, Square ksq) {
-    sq = (Square)(int(sq) ^ OrientTBL[Perspective][ksq]);
-    return 79856 + (color_of(pc) != Perspective) * 64 * 6 + (pc & 7) * 64 + sq;
+    return 79856 + (color_of(pc) != Perspective) * 64 * 6 + (pc & 7) * 64 + (int(sq) ^ OrientTBL[Perspective][ksq]);
 }
 // Index of a feature for a given king position and another piece on some square
 template<bool Perspective> std::optional<int> Full_Threats::make_threat_index(Piece attkr, Square from, Square to, Piece attkd, Square ksq) {
@@ -60,20 +59,23 @@ template<bool Perspective> std::optional<int> Full_Threats::make_threat_index(Pi
         attkr = Piece((int)attkr^8);
         attkd = Piece((int)attkd^8);
     }
-    if ((map[type_of(attkr)-1][type_of(attkd)-1] < 0) || (type_of(attkr) == type_of(attkd) && (enemy || type_of(attkr) != PAWN) && from < to)) {
+    if ((map[type_of(attkr)][type_of(attkd)] < 0) || (type_of(attkr) == type_of(attkd) && (enemy || type_of(attkr) != PAWN) && from < to)) {
         return std::nullopt;
     }
     Bitboard attacks = (type_of(attkr) == PAWN) ? pawn_attacks_bb(color_of(attkr), from) : attacks_bb(type_of(attkr), from, 0ULL);
+    if (attkr == BLACK_PAWN && from == SQ_B7 && to == SQ_A6 && attkd == BLACK_PAWN && ksq == SQ_B1) {
+        std::cout << " " << threatoffsets[attkr][65] << "+(" << (attkd/8) << "*" << (numvalidtargets[type_of(attkr)]/2) << "+" << map[type_of(attkr)][type_of(attkd)] << ")*" << threatoffsets[attkr][64] << "+" << threatoffsets[attkr][from] << "+" << _mm_popcnt_u64((square_bits(to)-1) & attacks) <<"=";
+    }
     return threatoffsets[attkr][65] + 
-        ((attkd/8)*(numvalidtargets[attkr]/2)+map[type_of(attkr)-1][type_of(attkd)-1])*threatoffsets[attkr][64]
+        ((attkd/8)*(numvalidtargets[type_of(attkr)]/2)+map[type_of(attkr)][type_of(attkd)])*threatoffsets[attkr][64]
     + threatoffsets[attkr][from] + _mm_popcnt_u64((square_bits(to)-1) & attacks);
 }
 
 // Get a list of indices for active features in ascending order
 template<bool Perspective> void Full_Threats::append_active_threats(const Bitboard *pieceBB, const Piece *mailbox, IndexList<96>& active) {
-    Square ksq = Square(_tzcnt_u64(pieceBB[Perspective] & pieceBB[2+KING]));
+    Square ksq = Square(_tzcnt_u64(pieceBB[6+Perspective] & pieceBB[KING]));
     bool order[2][2] = {{WHITE, BLACK}, {BLACK, WHITE}};
-    Bitboard occupied = pieceBB[WHITE] | pieceBB[BLACK];
+    Bitboard occupied = pieceBB[6+WHITE] | pieceBB[6+BLACK];
     IndexList<16> indices;
 
     for (int i = WHITE; i <= BLACK; i++) {
@@ -81,7 +83,7 @@ template<bool Perspective> void Full_Threats::append_active_threats(const Bitboa
             bool c = order[Perspective][i];
             PieceType pt = PieceType(j);
             Piece attkr = make_piece(c, pt);
-            Bitboard bb  = pieceBB[c] & pieceBB[2+pt];
+            Bitboard bb  = pieceBB[6+c] & pieceBB[pt];
             indices.clear();
             if (pt == PAWN) {
                 auto right = (c == WHITE) ? 9 : -9;
@@ -131,8 +133,8 @@ template<bool Perspective> void Full_Threats::append_active_threats(const Bitboa
 }
 
 template<bool Perspective> void Full_Threats::append_active_psq(const Board& board, IndexList<32>& active) {
-    Square   ksq = Square(_tzcnt_u64(board.piece_boards[Perspective] & board.piece_boards[2+KING]));
-    Bitboard bb  = (board.piece_boards[WHITE] | board.piece_boards[BLACK]);
+    Square   ksq = Square(_tzcnt_u64(board.piece_boards[6+Perspective] & board.piece_boards[KING]));
+    Bitboard bb  = (board.piece_boards[6+WHITE] | board.piece_boards[6+BLACK]);
     while (bb)
     {
         Square s = pop_lsb(bb);
@@ -142,16 +144,16 @@ template<bool Perspective> void Full_Threats::append_active_psq(const Board& boa
 }
 
 template<bool Perspective> void Full_Threats::append_active_features(const Bitboard *pieceBB, const Piece *mailbox, IndexList<32>& psq, IndexList<96>& threats) {
-    Square ksq = Square(_tzcnt_u64(pieceBB[Perspective] & pieceBB[2+KING]));
+    Square ksq = Square(_tzcnt_u64(pieceBB[6+Perspective] & pieceBB[KING]));
     bool order[2][2] = {{WHITE, BLACK}, {BLACK, WHITE}};
-    Bitboard occupied = pieceBB[WHITE] | pieceBB[BLACK];
+    Bitboard occupied = pieceBB[6+WHITE] | pieceBB[6+BLACK];
     IndexList<16> indices;
     for (int i = WHITE; i <= BLACK; i++) {
         for (int j = PAWN; j <= KING; j++) {
             bool c = order[Perspective][i];
             PieceType pt = PieceType(j);
             Piece attkr = make_piece(c, pt);
-            Bitboard bb  = pieceBB[c] & pieceBB[2+pt];
+            Bitboard bb  = pieceBB[6+c] & pieceBB[pt];
             indices.clear();
             if (pt == PAWN) {
                 int right = (c == WHITE) ? 9 : -9;
