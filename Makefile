@@ -1,20 +1,32 @@
 EXE ?= pzchessbot
-EVALFILE ?= nn-23507ff7848b.nnue
+EVALFILE ?= nnue.bin
 
 CXX := g++
-CXXFLAGS := -std=c++17 -march=native -static -DNNUE_PATH=\"$(EVALFILE)\"
+CXXFLAGS := -std=c++17 -march=native -DNNUE_PATH=\"$(EVALFILE)\"
 RELEASEFLAGS = -O3
-DEBUGFLAGS = -g
+DEBUGFLAGS = -g -fsanitize=address,undefined
 
 SRCS := $(wildcard engine/*.cpp engine/nnue/*.cpp)
 HDRS := $(wildcard engine/*.hpp engine/nnue/*.hpp)
 OBJS := $(SRCS:.cpp=.o)
 
-.PHONY: release debug clean
+.PHONY: release debug clean download
 
+all: release
+
+download: $(EVALFILE)
+
+$(EVALFILE):
+	@echo "Downloading NNUE file..."
+	@curl -o $(EVALFILE) https://data.stockfishchess.org/nn/nn-23507ff7848b.nnue
+
+$(OBJS): $(EVALFILE)
+
+release: download
 release: CXXFLAGS += $(RELEASEFLAGS)
 release: $(EXE)
 
+debug: download
 debug: CXXFLAGS += $(DEBUGFLAGS)
 debug: $(EXE)
 
