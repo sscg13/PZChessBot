@@ -229,9 +229,6 @@ Value eval(Board &board) {
 		// Likewise, if white has no king, this is mate for black
 		return -VALUE_MATE;
 	}
-	if (board.halfmove >= 100) {
-		return 0; // Draw by 50 moves
-	}
 
 	// Query the NNUE network
 	int npieces = _mm_popcnt_u64(board.piece_boards[OCC(WHITE)] | board.piece_boards[OCC(BLACK)]);
