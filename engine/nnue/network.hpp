@@ -41,7 +41,13 @@ struct Network {
 	void initialize(const Board& board);
     template<bool Perspective> void update_perspective_scratch(const Board& board);
     template<bool Perspective> void update_perspective_forward(const Board& board, const PieceChange& diff);
-	void update_forward(const Board& board, const PieceChange& diff) { ply++; update_perspective_forward<WHITE>(board, diff); update_perspective_forward<BLACK>(board, diff); }
+	void update_forward(const Board& board, const PieceChange& diff) { 
+        ply++; 
+        if (_mm_popcnt_u64(board.piece_boards[KING]) == 2) {
+            update_perspective_forward<WHITE>(board, diff); 
+            update_perspective_forward<BLACK>(board, diff); 
+        }
+    }
 	void update_backward() { ply--; }
     int32_t evaluate(bool color, int bucket);
 };
