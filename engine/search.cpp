@@ -287,7 +287,7 @@ Value __recurse(Board &board, int depth, Value alpha = -VALUE_INFINITE, Value be
 		 * We need to make sure that we aren't in check (since we might get mated) and that the
 		 * TT entry exists (so that the current position is actually good).
 		 */
-		int cur_eval = eval(board) * side; // TODO: Use the TT entry instead of the eval function?
+		int cur_eval = eval(board); // TODO: Use the TT entry instead of the eval function?
 		int margin = RFP_THRESHOLD * depth;
 		if (cur_eval >= beta + margin)
 			return cur_eval - margin;
