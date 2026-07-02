@@ -1,7 +1,5 @@
 # Project settings
-EXE				?= pzchessbot
-EVALFILE		?= nnue.bin
-
+EXE				?= pzshatranjbot
 GIT_SHORT_HASH	:= $(shell git rev-parse --short HEAD)
 GIT_DATE		:= $(shell git log -1 --format=%cd --date=format:"%Y%m%d")
 
@@ -11,7 +9,7 @@ VERSION			:= v$(GIT_DATE)-$(GIT_SHORT_HASH)-dev
 CXX	?= g++
 
 # Flags
-BASEFLAGS   := -std=c++20 -DNNUE_PATH=\"$(EVALFILE)\" -DVERSION=\"$(VERSION)\"
+BASEFLAGS   := -std=c++20 -DVERSION=\"$(VERSION)\"
 OPTFLAGS    := -O3 -flto=auto
 DEBUGFLAGS  := -g -march=x86-64-v3 -fsanitize=address,undefined
 LDFLAGS		:=
@@ -40,11 +38,13 @@ ifneq ($(NUMA_NODES),1)
 	LDFLAGS += -lnuma
 endif
 
-# Sources & objects
-SRCS	:= $(shell find engine -name "*.cpp") Pyrrhic/tbprobe.cpp
-HDRS	:= $(shell find engine -name "*.hpp") Pyrrhic/tbprobe.h
+# Sources & objects. GNU Make's wildcard is portable across Windows and Unix;
+# invoking `find` here resolves to Windows find.exe on common MSYS setups.
+SRCS	:= $(wildcard engine/*.cpp engine/*/*.cpp engine/*/*/*.cpp)
+HDRS	:= $(wildcard engine/*.hpp engine/*/*.hpp engine/*/*/*.hpp)
 OBJS	:= $(SRCS:.cpp=.o)
 DEPS	:= $(OBJS:.o=.d)
+GCDA	:= $(SRCS:.cpp=.gcda)
 
 .PHONY: all no-pext v3 v4 vnni arm native debug clean pgo pgo-compile
 
@@ -88,17 +88,16 @@ $(EXE): $(OBJS)
 # Cleanup
 clean:
 	@echo "Cleaning up..."
-	rm -f $(OBJS) $(DEPS)
-	rm -f $(shell find engine -name "*.gcda") Pyrrhic/*.gcda
+	$(RM) $(OBJS) $(DEPS) $(GCDA)
 
 pgo-compile: CXXFLAGS += $(BASEFLAGS) $(OPTFLAGS) -fprofile-use -march=native
 pgo-compile: $(EXE)
-	rm -f $(shell find engine -name "*.gcda") Pyrrhic/*.gcda
+	$(RM) $(GCDA)
 
 pgo: CXXFLAGS += $(BASEFLAGS) $(OPTFLAGS) -fprofile-generate -march=native
 pgo: $(EXE)
 	@echo "Running PGO instrumentation..."
 	./$(EXE) bench
-	rm $(OBJS) $(EXE)
+	$(RM) $(OBJS) $(EXE)
 	@echo "Recompiling with PGO optimizations..."
 	$(MAKE) pgo-compile

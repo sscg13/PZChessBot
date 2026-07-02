@@ -1,19 +1,19 @@
 /*
- * PZChessBot, a UCI chess engine
+ * PZShatranjBot, a UCI shatranj engine derived from PZChessBot
  * Copyright (C) 2026 Kevin Lu and William Ma
  *
- * PZChessBot is free software: you can redistribute it and/or modify
+ * PZShatranjBot is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
- * PZChessBot is distributed in the hope that it will be useful,
+ * PZShatranjBot is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with PZChessBot. If not, see <https://www.gnu.org/licenses/>.
+ * along with PZShatranjBot. If not, see <https://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -25,7 +25,6 @@
 #include "history.hpp"
 #include "movegen.hpp"
 #include "movepicker.hpp"
-#include "tb.hpp"
 #include "ttable.hpp"
 
 #include <algorithm>
@@ -85,8 +84,6 @@ struct alignas(64) NodeCounter {
 };
 
 extern NodeCounter nodes[MAX_THREADS];
-extern std::unordered_set<uint16_t> tb_moves;
-
 struct alignas(4096) ThreadInfo {
 	Position pos;
 	SSEntry *ss;
@@ -99,10 +96,9 @@ struct alignas(4096) ThreadInfo {
 	alignas(64) Corrhist thread_corrhist;
 	Move pvtable[MAX_PLY + 5][MAX_PLY + 5];
 	int pvlen[MAX_PLY + 5] = {};
-	AccumulatorManager am;
 	bool nmp_disable = false;
 
-	ThreadInfo() : am(pos) {
+	ThreadInfo() {
 		ss = (new SSEntry[MAX_PLY + 16]) + 8;
 	}
 

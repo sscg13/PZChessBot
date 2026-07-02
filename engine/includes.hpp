@@ -1,19 +1,19 @@
 /*
- * PZChessBot, a UCI chess engine
+ * PZShatranjBot, a UCI shatranj engine derived from PZChessBot
  * Copyright (C) 2026 Kevin Lu and William Ma
  *
- * PZChessBot is free software: you can redistribute it and/or modify
+ * PZShatranjBot is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
- * PZChessBot is distributed in the hope that it will be useful,
+ * PZShatranjBot is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with PZChessBot. If not, see <https://www.gnu.org/licenses/>.
+ * along with PZShatranjBot. If not, see <https://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -42,8 +42,6 @@
 #define VERSION "v7.1"
 #endif
 
-#define NNUE_PAWN_VALUE 3.30
-
 typedef uint64_t Bitboard;
 
 constexpr bool WHITE = false;
@@ -64,49 +62,45 @@ constexpr Value VALUE_TB_WIN_MAX_PLY = VALUE_TB_WIN - MAX_PLY;
 constexpr Value VALUE_WIN = VALUE_TB_WIN_MAX_PLY; // They're the same thing
 
 constexpr Value PawnValue = 100;
-constexpr Value KnightValue = 350;
-constexpr Value BishopValue = 350;
+constexpr Value AlfilValue = 150;
+constexpr Value FerzValue = 200;
+constexpr Value KnightValue = 300;
 constexpr Value RookValue = 525;
-constexpr Value QueenValue = 1000;
-constexpr Value VALUE_MAX = QueenValue * 9 + (KnightValue + BishopValue + RookValue) * 2;
+constexpr Value VALUE_MAX = FerzValue * 9 + (KnightValue + AlfilValue + RookValue) * 2;
 
 constexpr Value MAX_HISTORY = 16384;
 constexpr Value MAX_CORRHIST = 1024;
-
-#ifndef NNUE_PATH
-#define NNUE_PATH "nnue.bin"
-#endif
 
 #define CLOCKS_PER_MS (CLOCKS_PER_SEC / 1000)
 
 // clang-format off
 
-enum PieceType : uint8_t { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, NO_PIECETYPE };
+// Ordered by approximate shatranj material value. FEN keeps the orthodox
+// letters: b is an alfil and q is a ferz.
+enum PieceType : uint8_t { PAWN, ALFIL, FERZ, KNIGHT, ROOK, KING, NO_PIECETYPE };
 
 enum Piece : uint8_t {
 	WHITE_PAWN,
+	WHITE_ALFIL,
+	WHITE_FERZ,
 	WHITE_KNIGHT,
-	WHITE_BISHOP,
 	WHITE_ROOK,
-	WHITE_QUEEN,
 	WHITE_KING,
 	BLACK_PAWN = 8,
+	BLACK_ALFIL,
+	BLACK_FERZ,
 	BLACK_KNIGHT,
-	BLACK_BISHOP,
 	BLACK_ROOK,
-	BLACK_QUEEN,
 	BLACK_KING,
 	NO_PIECE
 };
 
-constexpr Value PieceValue[] = {PawnValue, KnightValue, BishopValue, RookValue, QueenValue, VALUE_INFINITE - VALUE_MAX, 0};
-constexpr Value MVV[] = { 800, 2400, 2400, 4800, 7200, 16000 };
+constexpr Value PieceValue[] = {PawnValue, AlfilValue, FerzValue, KnightValue, RookValue, VALUE_INFINITE - VALUE_MAX, 0};
+constexpr Value MVV[] = { 800, 1200, 1600, 2400, 4800, 16000 };
 
-enum CastlingRights : uint8_t { NO_CASTLE, WHITE_OO, WHITE_OOO = WHITE_OO << 1, BLACK_OO = WHITE_OO << 2, BLACK_OOO = WHITE_OO << 3 };
-
-constexpr PieceType letter_piece[] = {BISHOP, NO_PIECETYPE, NO_PIECETYPE, NO_PIECETYPE, NO_PIECETYPE, NO_PIECETYPE, NO_PIECETYPE, NO_PIECETYPE, NO_PIECETYPE, KING, NO_PIECETYPE, NO_PIECETYPE, KNIGHT, NO_PIECETYPE, PAWN, QUEEN, ROOK};
-constexpr char piecetype_letter[] = {'p', 'n', 'b', 'r', 'q', 'k', '?'};
-constexpr char piece_letter[] = {'P','N','B','R','Q','K','?','?','p','n','b','r','q','k','?'};
+constexpr PieceType letter_piece[] = {ALFIL, NO_PIECETYPE, NO_PIECETYPE, NO_PIECETYPE, NO_PIECETYPE, NO_PIECETYPE, NO_PIECETYPE, NO_PIECETYPE, NO_PIECETYPE, KING, NO_PIECETYPE, NO_PIECETYPE, KNIGHT, NO_PIECETYPE, PAWN, FERZ, ROOK};
+constexpr char piecetype_letter[] = {'p', 'b', 'q', 'n', 'r', 'k', '?'};
+constexpr char piece_letter[] = {'P','B','Q','N','R','K','?','?','p','b','q','n','r','k','?'};
 
 enum File : uint16_t {
 	FILE_A,
@@ -150,10 +144,6 @@ enum Square : uint8_t {
 	SQ_NONE
 };
 
-inline constexpr Square make_square(File file, Rank rank) {
-	return Square(file + rank * 8);
-}
-
 inline constexpr Square operator++(Square &square, int) {
 	return square = Square(square + 1);
 }
@@ -166,8 +156,6 @@ inline std::string to_string(Square square) {
 enum MoveType {
 	NORMAL,
 	PROMOTION = 1 << 14,
-	EN_PASSANT = 2 << 14,
-	CASTLING = 3 << 14,
 };
 
 #define RESET "\033[0m"

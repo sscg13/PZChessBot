@@ -1,19 +1,19 @@
 /*
- * PZChessBot, a UCI chess engine
+ * PZShatranjBot, a UCI shatranj engine derived from PZChessBot
  * Copyright (C) 2026 Kevin Lu and William Ma
  *
- * PZChessBot is free software: you can redistribute it and/or modify
+ * PZShatranjBot is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
- * PZChessBot is distributed in the hope that it will be useful,
+ * PZShatranjBot is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with PZChessBot. If not, see <https://www.gnu.org/licenses/>.
+ * along with PZShatranjBot. If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "movepicker.hpp"
@@ -76,7 +76,7 @@ Move MovePicker::next() {
 				if (capt)
 					score += MVV[pos.mailbox[move.dst()] & 7] + main_hist->get_capthist(pos, move);
 				if (promo)
-					score += MVV[move.promotion() + KNIGHT] - PawnValue;
+					score += MVV[FERZ] - PawnValue;
 				
 				noisy_scores.push_back({move, score});
 			} else {
@@ -152,7 +152,7 @@ Move MovePicker::next() {
 			if (pos.is_capture(move))
 				score = MVV[pos.mailbox[move.dst()] & 7] + main_hist->get_capthist(pos, move);
 			else
-				score = MVV[move.promotion() + KNIGHT] - PawnValue;
+				score = MVV[FERZ] - PawnValue;
 			noisy_scores.push_back({move, score});
 		}
 
@@ -185,7 +185,7 @@ Move MovePicker::next() {
 				if (capt)
 					score = MVV[pos.mailbox[move.dst()] & 7] + main_hist->get_capthist(pos, move);
 				if (promo)
-					score += MVV[move.promotion() + KNIGHT] - PawnValue;
+					score += MVV[FERZ] - PawnValue;
 				noisy_scores.push_back({move, score});
 			} else {
 				noisy_scores.push_back({move, -100000}); // order quiets after

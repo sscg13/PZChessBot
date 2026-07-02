@@ -1,19 +1,19 @@
 /*
- * PZChessBot, a UCI chess engine
+ * PZShatranjBot, a UCI shatranj engine derived from PZChessBot
  * Copyright (C) 2026 Kevin Lu and William Ma
  *
- * PZChessBot is free software: you can redistribute it and/or modify
+ * PZShatranjBot is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
- * PZChessBot is distributed in the hope that it will be useful,
+ * PZShatranjBot is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with PZChessBot. If not, see <https://www.gnu.org/licenses/>.
+ * along with PZShatranjBot. If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "search.hpp"
@@ -34,10 +34,6 @@ uint16_t num_threads = 1;
 
 std::atomic<uint64_t> nodecnt[64][64] = {{}};
 NodeCounter nodes[MAX_THREADS];
-std::atomic<uint64_t> tbhits = 0;
-
-std::unordered_set<uint16_t> tb_moves;
-
 uint64_t perft(Position &pos, int depth) {
 	if (depth == 0)
 		return 1;
@@ -88,7 +84,7 @@ __attribute__((constructor)) void init_mvvlva() {
 	for (int i = 0; i < 6; i++) {
 		for (int j = 0; j < 6; j++) {
 			if (i == KING)
-				MVV_LVA[i][j] = QueenValue * 13 + 1; // Prioritize over all other captures
+				MVV_LVA[i][j] = RookValue * 13 + 1; // Prioritize over all other captures
 			else
 				MVV_LVA[i][j] = PieceValue[i] * 13 - PieceValue[j];
 		}
@@ -197,7 +193,7 @@ std::string score_to_uci(Value score) {
 		return "cp " + std::to_string(score);
 	} else {
 		if (!do_datagen)
-			return "cp " + std::to_string(int(score / NNUE_PAWN_VALUE));
+			return "cp " + std::to_string(score);
 		else
 			return "cp " + std::to_string(score);
 	}
@@ -214,7 +210,7 @@ bool is_valid_score(Value score) {
  * Perform the quiescence search
  *
  * Quiescence search is a technique to avoid the horizon effect, where the evaluation function
- * incorrectly evaluates a position because it is not stable (e.g. there is a hanging queen).
+ * incorrectly evaluates a position because it is not stable (e.g. there is a hanging rook).
  * In this function, we search only captures and promotions, and return the best score.
  *
  * We also use stand pat to optimize the search further. If we are satisfied with our position,
@@ -255,13 +251,36 @@ Value quiesce(Position &pos, ThreadInfo &ti, Value alpha, Value beta, int side, 
 
 	RepetitionHandler &rp = ti.rp;
 
-	// Threefold or 50 move rule
-	if (rp.threefold(ply, pos.zobrist_without_ep()) || pos.halfmove >= 100 || pos.insufficient_material()) {
+	// Classical shatranj: threefold and 70 full moves without progress.
+	if (rp.threefold(ply, pos.zobrist) || pos.halfmove >= 140)
 		return 0;
+
+	if (pos.two_kings())
+		return 0;
+	// The bare side gets one move to bare the opponent in reply. Therefore a
+	// win is final only when the opponent of the side to move is bare.
+	if (pos.bare_king(!pos.side))
+		return VALUE_MATE - ply;
+
+	// At the horizon, explicitly resolve the bare side's one-move chance to
+	// capture the opponent's last piece and make a two-kings draw.
+	if (pos.bare_king(pos.side)) {
+		bool in_check = pos.checkers[pos.side];
+		if (!pos.has_legal_move())
+			return in_check ? -VALUE_MATE + ply : VALUE_MATE - ply;
+		pzstd::vector<Move> replies;
+		pos.captures(replies);
+		for (Move move : replies) {
+			if (!pos.is_legal(move)) continue;
+			Position after = pos;
+			after.make_move(move);
+			if (after.two_kings()) return 0;
+		}
+		return -VALUE_MATE + ply;
 	}
 
 	if (ply >= MAX_PLY)
-		return eval(pos, ti.am) * side; // Just in case
+		return eval(pos) * side; // Just in case
 
 	// Check for TTable cutoff
 	auto tentry = ttable.probe(pos.zobrist);
@@ -287,7 +306,7 @@ Value quiesce(Position &pos, ThreadInfo &ti, Value alpha, Value beta, int side, 
 	Value stand_pat = -VALUE_INFINITE;
 	Value raw_eval = -VALUE_INFINITE;
 	if (!in_check) {
-		stand_pat = tentry && is_valid_score(tentry->s_eval) ? tentry->s_eval : eval(pos, ti.am) * side;
+		stand_pat = tentry && is_valid_score(tentry->s_eval) ? tentry->s_eval : eval(pos) * side;
 		raw_eval = stand_pat;
 		ti.thread_corrhist.apply_correction(pos, ti.ss, ply, stand_pat);
 		if (tentry && is_valid_score(tteval) && abs(tteval) < VALUE_WIN && tentry->bound() != (tteval > stand_pat ? UPPER_BOUND : LOWER_BOUND))
@@ -354,15 +373,13 @@ Value quiesce(Position &pos, ThreadInfo &ti, Value alpha, Value beta, int side, 
 
 		Position pos_after = pos;
 		pos_after.make_move(move);
-		rp.push_hash(pos_after.zobrist_without_ep());
-		ti.am.make_move(pos, move, pos_after);
+		rp.push_hash(pos_after.zobrist);
 		ti.ss++;
 
 		arch::prefetch(&ttable.TT[pos_after.zobrist & (ttable.TT_SIZE - 1)]);
 		Value score = -quiesce(pos_after, ti, -beta, -alpha, -side, ply + 1, pv);
 
 		ti.ss--;
-		ti.am.pop_move();
 		rp.pop_hash();
 
 		ti.ss->move = NullMove;
@@ -402,6 +419,9 @@ Value quiesce(Position &pos, ThreadInfo &ti, Value alpha, Value beta, int side, 
 	if (in_check && best == -VALUE_INFINITE) {
 		return -VALUE_MATE + ply;
 	}
+	if (!in_check && !pos.has_legal_move()) {
+		return VALUE_MATE - ply;
+	}
 
 	Move tt_move = best_move != NullMove ? best_move : (tentry ? tentry->best_move : NullMove);
 	ttable.store(pos.zobrist, score_to_tt(best, ply), raw_eval, 0, ttf, pv, tt_move);
@@ -414,7 +434,7 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 	RepetitionHandler &rp = ti.rp;
 
 	if (ply >= MAX_PLY)
-		return eval(pos, ti.am) * side;
+		return eval(pos) * side;
 
 	if (pv) {
 		ti.pvlen[ply] = 0;
@@ -459,10 +479,13 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 		return alpha;
 	}
 
-	// Threefold or 50 move rule
-	if (!root && (rp.threefold(ply, pos.zobrist_without_ep()) || pos.halfmove >= 100 || pos.insufficient_material())) {
+	if (rp.threefold(ply, pos.zobrist) || pos.halfmove >= 140)
 		return 0;
-	}
+
+	if (pos.two_kings())
+		return 0;
+	if (pos.bare_king(!pos.side))
+		return VALUE_MATE - ply;
 
 	if (depth <= 0) {
 		// Reached the maximum depth, perform quiescence search
@@ -502,36 +525,6 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 		ttcapt = pos.is_capture(tentry->best_move);
 	}
 
-	/**
-	 * TB Probing
-	 *
-	 * If tablebases are available, we can look up our position to get a perfect evaluation.
-	 */
-	if (!root && !excluded && tbman.initialized && depth >= tbman.min_depth) {
-		auto tb_res = tbman.probe_pos(pos);
-		if (tb_res.has_value()) {
-			tbhits.fetch_add(1, std::memory_order_relaxed);
-			Value tb_score = 0;
-			if (tb_res == 1)
-				tb_score = VALUE_TB_WIN - ply;
-			else if (tb_res == -1)
-				tb_score = -VALUE_TB_WIN + ply;
-			else
-				tb_score = 0;
-
-			TTFlag tb_bound = EXACT;
-			if (tb_res == 1)
-				tb_bound = LOWER_BOUND;
-			else if (tb_res == -1)
-				tb_bound = UPPER_BOUND;
-
-			if (tb_bound == EXACT || (tb_bound == LOWER_BOUND && tb_score >= beta) || (tb_bound == UPPER_BOUND && tb_score <= alpha)) {
-				ttable.store(pos.zobrist, score_to_tt(tb_score, ply), VALUE_NONE, depth, tb_bound, ttpv, NullMove);
-				return tb_score;
-			}
-		}
-	}
-
 	bool in_check = pos.checkers[pos.side];
 
 	// Evaluate and correct evaluation
@@ -540,7 +533,7 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 	Value tt_corr_eval = 0;
 	Value corr_val = 0;
 	if (!in_check) {
-		cur_eval = tentry && is_valid_score(tentry->s_eval) ? tentry->s_eval : eval(pos, ti.am) * side;
+		cur_eval = tentry && is_valid_score(tentry->s_eval) ? tentry->s_eval : eval(pos) * side;
 		raw_eval = cur_eval;
 		if (!excluded)
 			ti.thread_corrhist.apply_correction(pos, ti.ss, ply, cur_eval);
@@ -597,7 +590,7 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 
 		Position pos_after = pos;
 		pos_after.make_move(NullMove);
-		rp.push_hash(pos_after.zobrist_without_ep());
+		rp.push_hash(pos_after.zobrist);
 		ti.ss++;
 
 		// Perform a reduced-depth search
@@ -673,8 +666,7 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 
 			Position pos_after = pos;
 			pos_after.make_move(pc_move);
-			rp.push_hash(pos_after.zobrist_without_ep());
-			ti.am.make_move(pos, pc_move, pos_after);
+			rp.push_hash(pos_after.zobrist);
 			ti.ss++;
 
 			arch::prefetch(&ttable.TT[pos_after.zobrist & (ttable.TT_SIZE - 1)]);
@@ -684,7 +676,6 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 				score = -negamax<false>(pos_after, ti, pc_depth, -pc_beta, -pc_beta + 1, -side, !cutnode, ply + 1);
 
 			ti.ss--;
-			ti.am.pop_move();
 			rp.pop_hash();
 
 			ti.ss->move = NullMove;
@@ -736,9 +727,6 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 	while ((move = mp.next()) != NullMove) {
 		if (move == ti.ss->excl || !pos.is_legal(move))
 			continue;
-
-		if (root && !tb_moves.empty() && !tb_moves.count(move.data))
-			continue; // If the current move isn't included in the viable TB moves, skip
 
 		bool capt = pos.is_capture(move);
 		bool promo = (move.type() == PROMOTION);
@@ -869,8 +857,7 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 
 		Position pos_after = pos;
 		pos_after.make_move(move);
-		rp.push_hash(pos_after.zobrist_without_ep());
-		ti.am.make_move(pos, move, pos_after);
+		rp.push_hash(pos_after.zobrist);
 		ti.ss++;
 
 		arch::prefetch(&ttable.TT[pos_after.zobrist & (ttable.TT_SIZE - 1)]);
@@ -956,7 +943,6 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 		}
 
 		ti.ss--;
-		ti.am.pop_move();
 		rp.pop_hash();
 
 		ti.ss->move = NullMove;
@@ -1027,9 +1013,7 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 		i++;
 	}
 
-	// Stalemate detection
-	// Second condition necessary for positions where one side is boxed in and can't move, but we can't mate
-	// e.g. 8/8/8/8/ppp1p3/krp1p2K/nbp1p3/nqrbN3 b - - 1 6
+	// In classical shatranj, the stalemated side wins.
 	if (best == -VALUE_MATE || best == -VALUE_INFINITE) {
 		// If our engine thinks we are mated but we are not in check, we are stalemated
 		if (excluded)
@@ -1037,7 +1021,7 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 		else if (in_check)
 			return -VALUE_MATE + ply;
 		else
-			return 0;
+			return VALUE_MATE - ply;
 	}
 
 	bool best_iscapture = pos.is_capture(best_move);
@@ -1071,7 +1055,7 @@ void iterativedeepening(Position &pos, ThreadInfo &ti, int depth) {
 
 	depth = std::min(depth, MAX_PLY - 1);
 
-	Value static_eval = eval(pos, ti.am) * (pos.side ? -1 : 1);
+	Value static_eval = eval(pos) * (pos.side ? -1 : 1);
 	int consec_move = 0;
 
 	Move best_move = NullMove;
@@ -1156,7 +1140,7 @@ void iterativedeepening(Position &pos, ThreadInfo &ti, int depth) {
 			if (time_elapsed >= 500)
 				last_line << " hashfull " << (int)(get_ttable_sz() * 1000);
 
-			last_line << " tbhits " << tbhits.load(std::memory_order_relaxed) << " pv";
+			last_line << " pv";
 
 			for (int ply = 0; ply < ti.pvlen[0]; ply++) {
 				last_line << " " << ti.pvtable[0][ply].to_string();
@@ -1213,7 +1197,6 @@ void prepare_search(int64_t time, int64_t maxnodes, bool quiet, uint16_t num) {
 	stop_search = false;
 	minimal = quiet;
 	num_threads = num;
-	tbhits.store(0, std::memory_order_relaxed);
 }
 
 void clear_search_vars(ThreadInfo &ti) {

@@ -1,19 +1,19 @@
 /*
- * PZChessBot, a UCI chess engine
+ * PZShatranjBot, a UCI shatranj engine derived from PZChessBot
  * Copyright (C) 2026 Kevin Lu and William Ma
  *
- * PZChessBot is free software: you can redistribute it and/or modify
+ * PZShatranjBot is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
- * PZChessBot is distributed in the hope that it will be useful,
+ * PZShatranjBot is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with PZChessBot. If not, see <https://www.gnu.org/licenses/>.
+ * along with PZShatranjBot. If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "includes.hpp"
@@ -35,7 +35,7 @@
 
 // Options
 size_t TT_SIZE = DEFAULT_TT_SIZE;
-bool quiet = false, dfrc_uci = false;
+bool quiet = false;
 int move_overhead = 0;
 
 uint64_t timemgmt(int64_t remtime, int64_t inc = 0) {
@@ -48,22 +48,19 @@ void run_uci() {
 	std::string command;
 	Position pos = Position();
 	RepetitionHandler rp;
-	rp.push_hash(pos.zobrist_without_ep());
+	rp.push_hash(pos.zobrist);
 	while (getline(std::cin, command)) {
 		if (command == "uci") {
-			std::cout << "id name PZChessBot " << VERSION << std::endl;
+			std::cout << "id name PZShatranjBot " << VERSION << std::endl;
 			std::cout << "id author kevlu8 and wdotmathree" << std::endl;
+			std::cout << "option name UCI_Variant type combo default shatranj var shatranj" << std::endl;
 			std::cout << "option name Hash type spin default 16 min 1 max " << MAX_TT << std::endl;
 			std::cout << "option name Threads type spin default 1 min 1 max " << MAX_THREADS << std::endl;
 			std::cout << "option name Quiet type check default false" << std::endl;
 			std::cout << "option name Move Overhead type spin default 0 min 0 max 10000" << std::endl;
 			std::cout << "option name softnodes type check default false" << std::endl;
 			std::cout << "option name datagen type check default false" << std::endl;
-			std::cout << "option name UCI_Chess960 type check default false" << std::endl;
 			std::cout << "option name UCI_ShowWDL type check default false" << std::endl;
-			std::cout << "option name SyzygyPath type string default <empty>" << std::endl;
-			std::cout << "option name SyzygyProbeDepth type spin default 1 min 1 max 100" << std::endl;
-			std::cout << "option name SyzygyProbeLimit type spin default 7 min 1 max 7" << std::endl;
 			print_uci();
 			std::cout << "uciok" << std::endl;
 		} else if (command == "icu") {
@@ -114,26 +111,8 @@ void run_uci() {
 			} else if (optionname == "datagen") {
 				do_datagen = optionvalue == "true";
 				std::cout << "info string datagen " << (do_datagen ? "enabled" : "disabled") << std::endl;
-			} else if (optionname == "UCI_Chess960") {
-				dfrc_uci = (optionvalue == "true");
 			} else if (optionname == "UCI_ShowWDL") {
 				show_wdl = (optionvalue == "true");
-			} else if (optionname == "SyzygyPath") {
-				if (optionvalue == "<empty>" || optionvalue == "") {
-					tbman.destroy();
-					std::cout << "info string Syzygy path cleared" << std::endl;
-				} else {
-					tbman.init(optionvalue);
-					if (tbman.initialized) {
-						std::cout << "info string Syzygy successfully loaded" << std::endl;
-					}
-				}
-			} else if (optionname == "SyzygyProbeDepth") {
-				int probe_depth = std::stoi(optionvalue);
-				tbman.min_depth = probe_depth;
-		 	} else if (optionname == "SyzygyProbeLimit") {
-				int piece_limit = std::stoi(optionvalue);
-				tbman.max_pieces = piece_limit;
 			} else {
 				handle_set(optionname, optionvalue);
 			}
@@ -142,7 +121,7 @@ void run_uci() {
 			pool.wait_finished();
 			pos = Position();
 			rp.clear();
-			rp.push_hash(pos.zobrist_without_ep());
+			rp.push_hash(pos.zobrist);
 			ttable.resize(TT_SIZE);
 			pool.clear_search_vars();
 		} else if (command.substr(0, 8) == "position") {
@@ -150,7 +129,7 @@ void run_uci() {
 			if (command.find("startpos") != std::string::npos) {
 				pos.reset_startpos();
 				rp.clear();
-				rp.push_hash(pos.zobrist_without_ep());
+				rp.push_hash(pos.zobrist);
 			} else if (command.find("fen") != std::string::npos) {
 				std::string fen = command.substr(command.find("fen") + 4);
 				if (fen.find("moves") != std::string::npos) {
@@ -158,7 +137,7 @@ void run_uci() {
 				}
 				pos.reset(fen);
 				rp.clear();
-				rp.push_hash(pos.zobrist_without_ep());
+				rp.push_hash(pos.zobrist);
 			}
 			if (command.find("moves") != std::string::npos) {
 				std::string moves = command.substr(command.find("moves") + 6);
@@ -166,7 +145,7 @@ void run_uci() {
 				std::string move;
 				while (ss >> move) {
 					pos.make_move(Move::from_string(move, &pos));
-					rp.push_hash(pos.zobrist_without_ep());
+					rp.push_hash(pos.zobrist);
 				}
 			}
 		} else if (command == "quit") {
@@ -231,7 +210,7 @@ void run_uci() {
 						continue;
 					Position pos_after = pos;
 					pos_after.make_move(move);
-					rp.push_hash(pos_after.zobrist_without_ep());
+					rp.push_hash(pos_after.zobrist);
 					uint64_t cnt = perft(pos_after, perft_depth - 1);
 					rp.pop_hash();
 					std::cout << move.to_string() << ": " << cnt << std::endl;
@@ -345,7 +324,7 @@ int main(int argc, char *argv[]) {
 	}
 	if (argc == 3 && std::string(argv[2]) == "quit") {
 		// assume genfens
-		// ./pzchessbot "genfens N seed S book None" "quit"
+		// ./pzshatranjbot "genfens N seed S book None" "quit"
 		bool filter_weird = true;
 		int nmoves = 12;
 		std::string genfens = argv[1];
@@ -369,8 +348,7 @@ int main(int argc, char *argv[]) {
 		Pool pool;
 		Position pos = Position();
 		RepetitionHandler rp;
-		AccumulatorManager &am = pool.get_ti(0).am;
-		rp.push_hash(pos.zobrist_without_ep());
+		rp.push_hash(pos.zobrist);
 		std::mt19937_64 rng(s);
 		std::ifstream bookfile(book == "None" ? "" : book);
 		std::vector<std::string> fens;
@@ -386,11 +364,11 @@ int main(int argc, char *argv[]) {
 			if (fens.empty()) { // no book datagen
 				pos.reset_startpos();
 				rp.clear();
-				rp.push_hash(pos.zobrist_without_ep());
+				rp.push_hash(pos.zobrist);
 			} else {
 				pos.reset(fens[rng() % fens.size()]);
 				rp.clear();
-				rp.push_hash(pos.zobrist_without_ep());
+				rp.push_hash(pos.zobrist);
 			}
 			bool restart = false;
 			for (int i = 0; i < nmoves; i++) {
@@ -406,9 +384,8 @@ int main(int argc, char *argv[]) {
 					break;
 				}
 				pos.make_move(legal_moves[rng() % legal_moves.size()]);
-				rp.push_hash(pos.zobrist_without_ep());
+				rp.push_hash(pos.zobrist);
 			}
-			am.full_refresh(pos, 0);
 			bool in_check = pos.checkers[pos.side];
 			bool checking_opponent = pos.checkers[!pos.side];
 			if (in_check || checking_opponent) restart = true;
@@ -418,7 +395,7 @@ int main(int argc, char *argv[]) {
 					restart = true;
 				else if (filter_weird) {
 					int npieces = arch::popcnt(pos.piece_boards[OCC(WHITE)] | pos.piece_boards[OCC(BLACK)]);
-					auto s_eval = eval(pos, am);
+					auto s_eval = eval(pos);
 					if (abs(s_eval) >= 2000) restart = true; // do a fast static eval to quickly filter out crazy positions
 					else {
 						pool.search(pos, rp, 1e9, MAX_PLY, 2000, true);
@@ -437,16 +414,16 @@ int main(int argc, char *argv[]) {
 	}
 	if (argc == 2 && std::string(argv[1]) == "pawnvalue") {
 		// calculate pawn value
-		Pool pool;
 		Position pos = Position();
-		AccumulatorManager &am = pool.get_ti(0).am;
 		int tot = 0;
-		Value startpos_score = eval(pos, am);
+		Value startpos_score = eval(pos);
 		for (int i = 0; i < 8; i++) {
 			pos.reset_startpos();
-			pos.mailbox[SQ_A2 + i] = NO_PIECE;
-			am.full_refresh(pos, 0);
-			Value score = eval(pos, am);
+			Square square = Square(SQ_A2 + i);
+			pos.mailbox[square] = NO_PIECE;
+			pos.piece_boards[PAWN] ^= square_bits(square);
+			pos.piece_boards[OCC(WHITE)] ^= square_bits(square);
+			Value score = eval(pos);
 			int diff = startpos_score - score;
 			tot += diff;
 		}
@@ -457,7 +434,6 @@ int main(int argc, char *argv[]) {
 	}
 	if (argc == 2 && std::string(argv[1]) == "avgeval") {
 		// assume book is at ./lichess-big3-resolved.txt
-		Pool pool;
 		Position pos = Position();
 		std::ifstream bookfile("./lichess-big3-resolved.txt");
 		std::string line;
@@ -467,12 +443,10 @@ int main(int argc, char *argv[]) {
 			std::cerr << "Could not open book file" << std::endl;
 			return 1;
 		}
-		AccumulatorManager &am = pool.get_ti(0).am;
 		while (getline(bookfile, line)) {
 			std::string fen = line.substr(0, line.find(' '));
 			pos.reset(fen);
-			am.full_refresh(pos, 0);
-			Value score = abs(eval(pos, am));
+			Value score = abs(eval(pos));
 			tot_eval += score;
 			npositions++;
 		}
@@ -480,6 +454,6 @@ int main(int argc, char *argv[]) {
 		std::cout << "info string Average eval over " << npositions << " positions: " << (tot_eval / npositions) << std::endl;
 		return 0;
 	}
-	std::cout << "PZChessBot " << VERSION << " developed by kevlu8 and wdotmathree" << std::endl;
+	std::cout << "PZShatranjBot " << VERSION << " developed by kevlu8 and wdotmathree" << std::endl;
 	run_uci();
 }

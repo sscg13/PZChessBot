@@ -1,41 +1,29 @@
 /*
- * PZChessBot, a UCI chess engine
+ * PZShatranjBot, a UCI shatranj engine derived from PZChessBot
  * Copyright (C) 2026 Kevin Lu and William Ma
  *
- * PZChessBot is free software: you can redistribute it and/or modify
+ * PZShatranjBot is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
- * PZChessBot is distributed in the hope that it will be useful,
+ * PZShatranjBot is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with PZChessBot. If not, see <https://www.gnu.org/licenses/>.
+ * along with PZShatranjBot. If not, see <https://www.gnu.org/licenses/>.
  */
 
 #pragma once
 
 #include <cstdint>
 
-// Define constants for each target
-#if defined(__ARM_NEON)
-#define TARGET_ARM_NEON
-#elif defined(__AVX512BW__)
-#define TARGET_X86_AVX512
-#elif defined(__AVX2__)
-#define TARGET_X86_AVX2
-#else
-#error Unsupported architecture
-#endif
-
-#include "simd/simd.hpp"
-
 // Determine pext usage
 #if defined(__BMI2__) && !defined(__znver1__) && !defined(__znver2__)
 #define USE_PEXT
+#include <immintrin.h>
 #endif
 
 namespace arch {

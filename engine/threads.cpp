@@ -1,19 +1,19 @@
 /*
- * PZChessBot, a UCI chess engine
+ * PZShatranjBot, a UCI shatranj engine derived from PZChessBot
  * Copyright (C) 2026 Kevin Lu and William Ma
  *
- * PZChessBot is free software: you can redistribute it and/or modify
+ * PZShatranjBot is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
- * PZChessBot is distributed in the hope that it will be useful,
+ * PZShatranjBot is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with PZChessBot. If not, see <https://www.gnu.org/licenses/>.
+ * along with PZShatranjBot. If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "threads.hpp"
@@ -82,21 +82,11 @@ void Pool::search(Position &pos, RepetitionHandler &rp, int64_t time, int depth,
 	for (int t = 0; t < num_threads; t++) {
 		ThreadInfo &ti = tis[t];
 		ti.rp = rp;
-		ti.am.full_refresh(pos, 0);
 		ti.seldepth = 0;
 		nodes[t] = 0;
 		ti.id = t;
 		ti.is_main = (t == 0);
 	}
-
-	bool rep = false;
-	for (int i = rp.hash_hist.size() - 2; i >= 0; i--) {
-		if (rp.hash_hist[i] == pos.zobrist_without_ep()) {
-			rep = true;
-			break;
-		}
-	}
-	tb_moves = tbman.probe_moves(pos, rep);
 
 	start_barrier->arrive_and_wait();
 	ready_barrier->arrive_and_wait();

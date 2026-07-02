@@ -1,19 +1,19 @@
 /*
- * PZChessBot, a UCI chess engine
+ * PZShatranjBot, a UCI shatranj engine derived from PZChessBot
  * Copyright (C) 2026 Kevin Lu and William Ma
  *
- * PZChessBot is free software: you can redistribute it and/or modify
+ * PZShatranjBot is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
- * PZChessBot is distributed in the hope that it will be useful,
+ * PZShatranjBot is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with PZChessBot. If not, see <https://www.gnu.org/licenses/>.
+ * along with PZShatranjBot. If not, see <https://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -38,17 +38,17 @@ std::tuple<int, int, int> score_to_wdl(Position &pos, Value score) {
 			case PAWN:
 				mat += 1;
 				break;
+			case ALFIL:
+				mat += 1;
+				break;
+			case FERZ:
+				mat += 2;
+				break;
 			case KNIGHT:
 				mat += 3;
 				break;
-			case BISHOP:
-				mat += 3;
-				break;
 			case ROOK:
-				mat += 5;
-				break;
-			case QUEEN:
-				mat += 9;
+				mat += 6;
 				break;
 		}
 	}

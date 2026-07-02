@@ -1,56 +1,30 @@
-# PZChessBot
+# PZShatranjBot
 
 ![donate btc](https://img.shields.io/badge/donate%20btc-31pma4U314hJHSxXBECWxYFPBgL7n9BoCC-blue)
 
-<img src="logo.png" alt="PZChessBot Logo" width="1024"/>
+<img src="logo.png" alt="PZShatranjBot Logo" width="1024"/>
 
-A chess engine created by two high school students, started when we were in middle school!
-
-[Play against PZChessBot!](https://lichess.org/@/PZChessBot)
+PZShatranjBot is a UCI shatranj engine derived from PZChessBot.
 
 ## Installation
 
-For a non-development build, simply navigate to the [releases page](https://github.com/kevlu8/PZChessBot/releases) and download the latest release.
-
-For the latest development build, you can clone the repository and build it yourself:
+Clone the repository and build it locally:
 
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/kevlu8/PZChessBot.git
+git clone https://github.com/kevlu8/PZShatranjBot.git
 ```
 
-2. Download the latest NNUE model from [PZChessBot-Networks](https://github.com/kevlu8/PZChessBot-Networks/releases) and place it in the `PZChessBot` folder. Make sure the model is named `nnue.bin`.
-
-3. Build the engine:
+2. Build the engine:
 
 ```bash
 make -j
 ```
 
-## Strength
-
-|      Version     | CCRL Blitz | CCRL 40/15 | CCRL 40/15 4CPU | Lichess Rapid |
-| ---------------- | ---------- | ---------- | --------------- | ------------- |
-| v20250311T07     |   ~1900    |     -      |        -        |     2000      |
-| v1.0             |    2712    |     -      |        -        |     2500      |
-| v20250421T23-dev |   ~3000    |     -      |        -        |     2600      |
-| v2.0             |    2986    |     -      |        -        |     2650      |
-| v20250621T09-dev |   ~3100    |     -      |        -        |     2700      |
-| v20250623T22-dev |   ~3160    |     -      |        -        |     2800      |
-| v3.0             |    3305    |    3275    |        -        |     2850      |
-| v20250729T08-dev |   ~3400    |     -      |        -        |     2900      |
-| v4.0             |    3444    |    3374    |        -        |     2850      |
-| v5.0             |    3457    |    3396    |        -        |     2850      |
-| v6.0             |    3597    |    3491    |        -        |     2900      |
-| v6.1             |   ~3630    |    3504    |      3573       |     2950      |
-| v20260313-dev    |   ~3660    |     -      |        -        |     3050      |
-| v7.0             |    3701    |    3573    |      3607       |     3050      |
-| v7.1             |   ~3710    |     -      |        -        |     3050      |
-
 ## Logistics & Features
 
-PZChessBot is a basic negamax engine.
+PZShatranjBot is a basic negamax engine.
 
 ### Search
 
@@ -86,17 +60,15 @@ PZChessBot is a basic negamax engine.
 
 ### Evaluation
 
-- NNUE-type evaluation with horizontal mirroring
-- Runs a (768x12hm->1280)x2pw->(16->32->1)x8 model
-- Trained from zero-knowledge using self-play games
+- Shatranj piece-square evaluation adapted from Prolix's PRF evaluator
+- Includes material, piece placement, and a side-to-move tempo bonus
 
 ### Special Thanks
 
 - The [Stockfish Discord Server](https://discord.gg/XUyHyT5ap9), specifically `#engines-dev` for their help!
-- The [bullet](https://github.com/jw1912/bullet) NNUE trainer
+- [Prolix](https://github.com/sscg13/Prolix) for the initial shatranj PRF parameters
 - The [ChessProgramming Wiki](https://chessprogramming.org/) for their clear albeit outdated explanations
 - [OpenBench](https://github.com/AndyGrant/OpenBench) for providing an excellent testing GUI
 - [sscg13](https://github.com/sscg13) for having shared an OpenBench instance with me and helping me with a lot of miscellaneous stuff
 - [Jonathan Hallström](https://github.com/JonathanHallstrom) for donating hardware and giving lots of advice
-- [Pyrrhic](https://github.com/AndyGrant/Pyrrhic) for providing tablebase probing code
 - Lastly, YOU for checking out this project!

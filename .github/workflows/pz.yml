@@ -1,4 +1,4 @@
-name: PZ Compilation Verification
+name: PZShatranjBot Compilation Verification
 
 on:
   push:
@@ -38,13 +38,11 @@ jobs:
           echo "ERROR: No reference bench found"
           exit 1
         fi
-    - name: Fetch latest NNUE
-      run: curl -fsSL -o nnue.bin https://github.com/kevlu8/PZChessBot-Networks/releases/latest/download/nnue.bin
     - name: Compile
       run: make -j4 native
     - name: Check Bench
       run: |
-        out=$(eval "./pzchessbot bench 2>&1" | tail -n 1)
+        out=$(eval "./pzshatranjbot bench 2>&1" | tail -n 1)
         obtained=$(eval "echo $out" | awk '{print $1}')
         speed=$(eval "echo $out" | awk '{print $3}')
         echo "speed $speed"
