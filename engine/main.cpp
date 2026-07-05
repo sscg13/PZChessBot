@@ -21,6 +21,7 @@
 #include <random>
 #include <sstream>
 #include <thread>
+#include <vector>
 
 #include "bitboard.hpp"
 #include "datagen.hpp"
@@ -249,30 +250,37 @@ void run_uci() {
 int main(int argc, char *argv[]) {
 	print_config();
 	if (argc >= 2 && (std::string(argv[1]) == "datagen" || std::string(argv[1]).starts_with("datagen "))) {
-		std::string command;
-		for (int i = 1; i < argc; i++) {
-			if (!command.empty()) command += ' ';
-			command += argv[i];
+		std::vector<std::string> args;
+		if (std::string(argv[1]).starts_with("datagen ")) {
+			std::stringstream command(argv[1]);
+			std::string token;
+			while (command >> token) args.push_back(token);
+			for (int i = 2; i < argc; i++)
+				if (std::string(argv[i]) != "quit") args.push_back(argv[i]);
+		} else {
+			for (int i = 1; i < argc; i++) args.push_back(argv[i]);
 		}
-		std::stringstream ss(command);
-		std::string token;
 		uint64_t target_positions = 0;
 		std::optional<uint64_t> seed;
 		std::string output_file = "data.bullet.txt";
-		ss >> token >> target_positions;
-		while (ss >> token) {
+		size_t datagen_threads = 1;
+		if (args.size() >= 2) target_positions = std::stoull(args[1]);
+		for (size_t i = 2; i < args.size(); i++) {
+			const std::string &token = args[i];
 			if (token == "seed") {
-				uint64_t value;
-				ss >> value;
-				seed = value;
+				if (++i < args.size()) seed = std::stoull(args[i]);
+			} else if (token == "output") {
+				if (++i < args.size()) output_file = args[i];
+			} else if (token == "threads") {
+				if (++i < args.size()) datagen_threads = std::stoull(args[i]);
 			}
-			else if (token == "output") ss >> output_file;
 		}
-		if (target_positions == 0) {
-			std::cerr << "Usage: pzshatranjbot datagen <positions> [seed <seed>] [output <file>]" << std::endl;
+		if (target_positions == 0 || datagen_threads < 1 || datagen_threads > MAX_THREADS) {
+			std::cerr << "Usage: pzshatranjbot datagen <positions> [threads <1-" << MAX_THREADS
+			          << ">] [seed <seed>] [output <file>]" << std::endl;
 			return 1;
 		}
-		return run_datagen(target_positions, seed, output_file);
+		return run_datagen_workers(argv[0], target_positions, seed, output_file, datagen_threads);
 	}
 	if (argc >= 2 && std::string(argv[1]) == "bench") {
 		// Shatranj positions from the Prolix benchmark suite.

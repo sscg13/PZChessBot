@@ -17,8 +17,18 @@
 
 #include <chrono>
 #include <cctype>
+#include <filesystem>
 #include <random>
+#include <thread>
 #include <vector>
+
+#if defined(_WIN32)
+#include <process.h>
+#else
+#include <spawn.h>
+#include <sys/wait.h>
+extern char **environ;
+#endif
 
 namespace {
 
@@ -56,6 +66,44 @@ uint64_t randomized_seed() {
 	std::random_device random;
 	uint64_t seed = uint64_t(random()) << 32 | random();
 	return seed ^ uint64_t(std::chrono::steady_clock::now().time_since_epoch().count());
+}
+
+uint64_t worker_seed(uint64_t base, uint64_t worker) {
+	// SplitMix64 gives every worker a well-separated, reproducible stream.
+	uint64_t value = base + 0x9e3779b97f4a7c15ULL * worker;
+	value = (value ^ (value >> 30)) * 0xbf58476d1ce4e5b9ULL;
+	value = (value ^ (value >> 27)) * 0x94d049bb133111ebULL;
+	return value ^ (value >> 31);
+}
+
+std::string worker_output(const std::string &output_file, size_t worker) {
+	std::filesystem::path path(output_file);
+	std::string filename = path.stem().string() + "." + std::to_string(worker) + path.extension().string();
+	return (path.parent_path() / filename).string();
+}
+
+int launch_worker(const std::string &executable, uint64_t positions, uint64_t seed,
+                  const std::string &output_file) {
+	std::vector<std::string> storage = {
+		executable, "datagen", std::to_string(positions), "threads", "1", "seed",
+		std::to_string(seed), "output", output_file
+	};
+#if defined(_WIN32)
+	std::vector<const char *> args;
+	for (const std::string &arg : storage) args.push_back(arg.c_str());
+	args.push_back(nullptr);
+	return int(_spawnvp(_P_WAIT, executable.c_str(), args.data()));
+#else
+	std::vector<char *> args;
+	for (std::string &arg : storage) args.push_back(arg.data());
+	args.push_back(nullptr);
+	pid_t pid;
+	int error = posix_spawnp(&pid, executable.c_str(), nullptr, nullptr, args.data(), environ);
+	if (error) return error;
+	int status;
+	if (waitpid(pid, &status, 0) < 0) return 1;
+	return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+#endif
 }
 
 // Prolix-style FRS has 360 legal back ranks: alfils start on opposite
@@ -163,7 +211,8 @@ int run_datagen(uint64_t target_positions, std::optional<uint64_t> requested_see
 	suppress_search_output = true;
 
 	std::cout << "Internal datagen: " << target_positions << " positions, seed " << seed
-	          << ", soft node limit " << SoftNodeLimit << ", hard node limit " << HardNodeLimit << std::endl;
+	          << ", soft node limit " << SoftNodeLimit
+	          << ", hard node limit " << HardNodeLimit << std::endl;
 	std::cout << "Output: " << output_file << std::endl;
 
 	while (positions < target_positions) {
@@ -249,5 +298,30 @@ int run_datagen(uint64_t target_positions, std::optional<uint64_t> requested_see
 
 	do_softnodes = old_softnodes;
 	suppress_search_output = old_suppress_output;
+	return 0;
+}
+
+int run_datagen_workers(const std::string &executable, uint64_t positions_per_worker,
+                        std::optional<uint64_t> requested_seed, const std::string &output_file, size_t workers) {
+	if (workers == 1)
+		return run_datagen(positions_per_worker, requested_seed, output_file);
+
+	uint64_t base_seed = requested_seed.value_or(randomized_seed());
+	std::cout << "Launching " << workers << " single-threaded datagen workers; "
+	          << positions_per_worker << " positions per worker, base seed " << base_seed << std::endl;
+
+	std::vector<std::thread> launchers;
+	std::vector<int> results(workers, 1);
+	for (size_t worker = 0; worker < workers; worker++) {
+		std::string output = worker_output(output_file, worker);
+		uint64_t seed = worker_seed(base_seed, worker);
+		std::cout << "Worker " << worker << ": seed " << seed << ", output " << output << std::endl;
+		launchers.emplace_back([&, worker, output, seed] {
+			results[worker] = launch_worker(executable, positions_per_worker, seed, output);
+		});
+	}
+	for (std::thread &launcher : launchers) launcher.join();
+	for (int result : results)
+		if (result != 0) return result;
 	return 0;
 }

@@ -13,3 +13,5 @@
 #include "includes.hpp"
 
 int run_datagen(uint64_t target_positions, std::optional<uint64_t> seed, const std::string &output_file);
+int run_datagen_workers(const std::string &executable, uint64_t positions_per_worker,
+                        std::optional<uint64_t> seed, const std::string &output_file, size_t workers);
