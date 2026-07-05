@@ -1204,8 +1204,8 @@ void prepare_search(int64_t time, int64_t maxnodes, int64_t hardnodes, bool quie
 }
 
 void clear_search_vars(ThreadInfo &ti) {
-	memset(&ti.thread_hist, 0, sizeof(History));
-	memset(&ti.thread_corrhist, 0, sizeof(Corrhist));
+	ti.thread_hist.clear();
+	ti.thread_corrhist.clear();
 	for (int i = -8; i < MAX_PLY + 8; i++) {
 		ti.ss[i] = SSEntry();
 	}

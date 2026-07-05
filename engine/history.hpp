@@ -29,9 +29,8 @@
 struct ContHistEntry {
 	Value hist[2][7][64]; // [side][piecetype][to]
 
-	ContHistEntry() {
-		memset(hist, 0, sizeof(hist));
-	}
+	ContHistEntry() { clear(); }
+	void clear() { memset(hist, 0, sizeof(hist)); }
 };
 
 struct SSEntry {
@@ -61,9 +60,13 @@ struct History {
 	 */
 	Value capthist[2][6][6][64]; // [piece][captured][dst]
 
-	History() {
+	History() { clear(); }
+
+	void clear() {
 		memset(history, 0, sizeof(history));
-		memset(cont_hist, 0, sizeof(cont_hist));
+		for (auto &side : cont_hist)
+			for (auto &piece : side)
+				for (auto &entry : piece) entry.clear();
 		memset(capthist, 0, sizeof(capthist));
 	}
 
@@ -89,12 +92,16 @@ struct Corrhist {
 	ContHistEntry corrhist_cont[2][7][64]; // [side][piece][to]
 	Value corrhist_threat[2][CORRHIST_SZ];
 
-	Corrhist() {
+	Corrhist() { clear(); }
+
+	void clear() {
 		memset(corrhist_ps, 0, sizeof(corrhist_ps));
 		memset(corrhist_np, 0, sizeof(corrhist_np));
 		memset(corrhist_maj, 0, sizeof(corrhist_maj));
 		memset(corrhist_min, 0, sizeof(corrhist_min));
-		memset(corrhist_cont, 0, sizeof(corrhist_cont));
+		for (auto &side : corrhist_cont)
+			for (auto &piece : side)
+				for (auto &entry : piece) entry.clear();
 		memset(corrhist_threat, 0, sizeof(corrhist_threat));
 	}
 
