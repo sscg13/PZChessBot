@@ -14,6 +14,12 @@ OPTFLAGS    := -O3 -flto=auto
 DEBUGFLAGS  := -g -march=x86-64-v3 -fsanitize=address,undefined
 LDFLAGS		:=
 
+# std::thread requires the pthread compile and link flags on Unix-like systems.
+ifneq ($(OS),Windows_NT)
+BASEFLAGS += -pthread
+LDFLAGS += -pthread
+endif
+
 # NUMA handling
 NUMA_NODES := 1
 
