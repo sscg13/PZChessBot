@@ -24,10 +24,11 @@
 #define MOVENUM(x) ((((#x)[1] - '1') << 12) | (((#x)[0] - 'a') << 8) | (((#x)[3] - '1') << 4) | ((#x)[2] - 'a'))
 
 uint64_t mx_nodes = 1e18; // Maximum nodes to search
+uint64_t hard_node_limit = 1e18;
 bool stop_search = true;
 std::chrono::steady_clock::time_point start;
 uint64_t mxtime = 1e18; // Maximum time to search in milliseconds
-bool minimal = false, show_wdl = false, do_softnodes = false, do_datagen = false;
+bool minimal = false, show_wdl = false, do_softnodes = false, do_datagen = false, suppress_search_output = false;
 std::stringstream last_line;
 
 uint16_t num_threads = 1;
@@ -243,7 +244,7 @@ Value quiesce(Position &pos, ThreadInfo &ti, Value alpha, Value beta, int side, 
 		if (!do_softnodes && cur_nodes > mx_nodes) {
 			stop_search = true;
 			return 0;
-		} else if (do_softnodes && mx_nodes < 1e15 && cur_nodes > mx_nodes * 50) {
+		} else if (do_softnodes && cur_nodes > hard_node_limit) {
 			stop_search = true;
 			return 0;
 		}
@@ -460,7 +461,7 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 		if (!do_softnodes && cur_nodes > mx_nodes) {
 			stop_search = true;
 			return 0;
-		} else if (do_softnodes && mx_nodes < 1e15 && cur_nodes > mx_nodes * 50) {
+		} else if (do_softnodes && cur_nodes > hard_node_limit) {
 			stop_search = true;
 			return 0;
 		}
@@ -1103,7 +1104,7 @@ void iterativedeepening(Position &pos, ThreadInfo &ti, int depth) {
 		if (stop_search)
 			break;
 		eval = result;
-		Move mv = ti.pvtable[0][0];
+		Move mv = ti.pvlen[0] ? ti.pvtable[0][0] : NullMove;
 
 		if (mv == best_move) {
 			consec_move++;
@@ -1180,19 +1181,22 @@ void iterativedeepening(Position &pos, ThreadInfo &ti, int depth) {
 
 	if (ti.is_main) {
 		stop_search = true;
-		if (minimal)
-			std::cout << last_line.str() << std::endl;
-		std::cout << "bestmove " << best_move.to_string() << std::endl;
+		if (!suppress_search_output) {
+			if (minimal)
+				std::cout << last_line.str() << std::endl;
+			std::cout << "bestmove " << best_move.to_string() << std::endl;
+		}
 	}
 }
 
-void prepare_search(int64_t time, int64_t maxnodes, bool quiet, uint16_t num) {
+void prepare_search(int64_t time, int64_t maxnodes, int64_t hardnodes, bool quiet, uint16_t num) {
 	for (int i = 0; i < 64; i++)
 		for (int j = 0; j < 64; j++)
 			nodecnt[i][j] = 0;
 
 	mxtime = time;
 	mx_nodes = maxnodes;
+	hard_node_limit = hardnodes;
 	start = std::chrono::steady_clock::now();
 	stop_search = false;
 	minimal = quiet;

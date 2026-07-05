@@ -23,6 +23,7 @@
 #include <thread>
 
 #include "bitboard.hpp"
+#include "datagen.hpp"
 #include "eval.hpp"
 #include "history.hpp"
 #include "movegen.hpp"
@@ -247,6 +248,32 @@ void run_uci() {
 
 int main(int argc, char *argv[]) {
 	print_config();
+	if (argc >= 2 && (std::string(argv[1]) == "datagen" || std::string(argv[1]).starts_with("datagen "))) {
+		std::string command;
+		for (int i = 1; i < argc; i++) {
+			if (!command.empty()) command += ' ';
+			command += argv[i];
+		}
+		std::stringstream ss(command);
+		std::string token;
+		uint64_t target_positions = 0;
+		std::optional<uint64_t> seed;
+		std::string output_file = "data.bullet.txt";
+		ss >> token >> target_positions;
+		while (ss >> token) {
+			if (token == "seed") {
+				uint64_t value;
+				ss >> value;
+				seed = value;
+			}
+			else if (token == "output") ss >> output_file;
+		}
+		if (target_positions == 0) {
+			std::cerr << "Usage: pzshatranjbot datagen <positions> [seed <seed>] [output <file>]" << std::endl;
+			return 1;
+		}
+		return run_datagen(target_positions, seed, output_file);
+	}
 	if (argc >= 2 && std::string(argv[1]) == "bench") {
 		const std::string bench_positions[] = {
 			"r3k2r/2pb1ppp/2pp1q2/p7/1nP1B3/1P2P3/P2N1PPP/R2QK2R w KQkq - 0 14",
@@ -320,96 +347,6 @@ int main(int argc, char *argv[]) {
 		}
 		uint64_t end = clock();
 		std::cout << tot_nodes << " nodes " << int(tot_nodes / ((double)(end - start) / CLOCKS_PER_SEC)) << " nps" << std::endl;
-		return 0;
-	}
-	if (argc == 3 && std::string(argv[2]) == "quit") {
-		// assume genfens
-		// ./pzshatranjbot "genfens N seed S book None" "quit"
-		bool filter_weird = true;
-		int nmoves = 12;
-		std::string genfens = argv[1];
-		std::stringstream ss(genfens);
-		std::string book, token;
-		uint64_t n = 0, s = 0;
-		while (ss >> token) {
-			if (token == "genfens")
-				ss >> n;
-			else if (token == "seed")
-				ss >> s;
-			else if (token == "book")
-				ss >> book;
-			else if (token == "filter") {
-				ss >> token;
-				filter_weird = token == "1" || token == "true";
-			} else if (token == "nmoves") {
-				ss >> nmoves;
-			}
-		}
-		Pool pool;
-		Position pos = Position();
-		RepetitionHandler rp;
-		rp.push_hash(pos.zobrist);
-		std::mt19937_64 rng(s);
-		std::ifstream bookfile(book == "None" ? "" : book);
-		std::vector<std::string> fens;
-		if (bookfile.is_open()) {
-			std::string line;
-			while (getline(bookfile, line)) {
-				fens.push_back(line);
-			}
-			bookfile.clear();
-			bookfile.close();
-		}
-		while (n--) {
-			if (fens.empty()) { // no book datagen
-				pos.reset_startpos();
-				rp.clear();
-				rp.push_hash(pos.zobrist);
-			} else {
-				pos.reset(fens[rng() % fens.size()]);
-				rp.clear();
-				rp.push_hash(pos.zobrist);
-			}
-			bool restart = false;
-			for (int i = 0; i < nmoves; i++) {
-				pzstd::vector<Move> moves;
-				pos.legal_moves(moves);
-				pzstd::vector<Move> legal_moves;
-				for (Move &move : moves) {
-					if (pos.is_legal(move))
-						legal_moves.push_back(move);
-				}
-				if (legal_moves.size() == 0) {
-					restart = true;
-					break;
-				}
-				pos.make_move(legal_moves[rng() % legal_moves.size()]);
-				rp.push_hash(pos.zobrist);
-			}
-			bool in_check = pos.checkers[pos.side];
-			bool checking_opponent = pos.checkers[!pos.side];
-			if (in_check || checking_opponent) restart = true;
-			// make sure position is legal and somewhat balanced
-			if (!restart) {
-				if (arch::popcnt(pos.piece_boards[KING]) != 2)
-					restart = true;
-				else if (filter_weird) {
-					int npieces = arch::popcnt(pos.piece_boards[OCC(WHITE)] | pos.piece_boards[OCC(BLACK)]);
-					auto s_eval = eval(pos);
-					if (abs(s_eval) >= 2000) restart = true; // do a fast static eval to quickly filter out crazy positions
-					else {
-						pool.search(pos, rp, 1e9, MAX_PLY, 2000, true);
-						auto res = pool.wait_finished();
-						if (abs(res.second) >= 2000) restart = true;
-					}
-				}
-			}
-			if (restart) {
-				n++;
-				continue;
-			}
-			std::cout << "info string genfens " << pos.get_fen() << std::endl;
-		}
 		return 0;
 	}
 	if (argc == 2 && std::string(argv[1]) == "pawnvalue") {

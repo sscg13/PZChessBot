@@ -74,8 +74,9 @@ void Pool::thread_loop(size_t i) {
 	}
 }
 
-void Pool::search(Position &pos, RepetitionHandler &rp, int64_t time, int depth, int64_t maxnodes, bool quiet) {
-	prepare_search(time, maxnodes, quiet, num_threads);
+void Pool::search(Position &pos, RepetitionHandler &rp, int64_t time, int depth, int64_t maxnodes, bool quiet,
+                  int64_t hardnodes) {
+	prepare_search(time, maxnodes, hardnodes, quiet, num_threads);
 	this->depth = depth;
 	this->pos = pos;
 
@@ -96,5 +97,5 @@ std::pair<Move, Value> Pool::wait_finished() {
 	std::unique_lock lock(mtx);
 
 	ThreadInfo &best_thread = tis[0];
-	return {best_thread.pvtable[0][0], best_thread.eval};
+	return {best_thread.pvlen[0] ? best_thread.pvtable[0][0] : NullMove, best_thread.eval};
 }

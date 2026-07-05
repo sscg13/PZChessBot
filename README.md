@@ -63,6 +63,22 @@ PZShatranjBot is a basic negamax engine.
 - Shatranj piece-square evaluation adapted from Prolix's PRF evaluator
 - Includes material, piece placement, and a side-to-move tempo bonus
 
+### Internal data generation
+
+Generate self-play positions in `FEN | score | result` format:
+
+```bash
+./pzshatranjbot datagen 1000000 output data.bullet.txt
+```
+
+Games use mirrored Prolix-style FRS starting positions followed by eight random
+legal plies. The seed is randomized automatically; add `seed 1` for a
+reproducible run. Searches use a 5,000 soft-node and 100,000 hard-node limit per
+move. Wins are adjudicated after six
+consecutive plies at an absolute score of at least 2,000; draws are adjudicated
+after eight consecutive plies at an absolute score of at most 10 once the game
+has passed ply 80.
+
 ### Special Thanks
 
 - The [Stockfish Discord Server](https://discord.gg/XUyHyT5ap9), specifically `#engines-dev` for their help!

@@ -65,7 +65,8 @@ public:
 
 	void resize(size_t num);
 
-	void search(Position &pos, RepetitionHandler &rp, int64_t time, int depth, int64_t maxnodes, bool quiet);
+	void search(Position &pos, RepetitionHandler &rp, int64_t time, int depth, int64_t maxnodes, bool quiet,
+	            int64_t hardnodes = 1e18);
 
 	void clear_search_vars() {
 		std::unique_lock lock(mtx);

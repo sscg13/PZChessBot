@@ -66,6 +66,7 @@ extern bool stop_search;
 extern bool show_wdl;
 extern bool do_softnodes;
 extern bool do_datagen;
+extern bool suppress_search_output;
 
 struct alignas(64) NodeCounter {
 	std::atomic<uint64_t> val = 0;
@@ -107,7 +108,7 @@ struct alignas(4096) ThreadInfo {
 	}
 };
 
-void prepare_search(int64_t time, int64_t maxnodes, bool quiet, uint16_t num_threads);
+void prepare_search(int64_t time, int64_t maxnodes, int64_t hardnodes, bool quiet, uint16_t num_threads);
 
 void iterativedeepening(Position &pos, ThreadInfo &ti, int depth);
 
