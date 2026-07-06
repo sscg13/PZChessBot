@@ -20,6 +20,7 @@
 #include "incbin.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -111,7 +112,7 @@ int32_t nnue_eval(const Network &network, const NnueAccumulator &stm, const Nnue
 		int sum = 0;
 		for (int j = 0; j < NNUE_ACCUMULATOR_SIZE; j++)
 			sum += int(l1[j]) * int(network.l1_weights[output_bucket][i][j]);
-		float value = sum * L1_SCALE + network.l1_biases[output_bucket][i];
+		float value = std::fma(float(sum), L1_SCALE, network.l1_biases[output_bucket][i]);
 		value = std::clamp(value, 0.0f, 1.0f);
 		l2[i] = value * value;
 	}
@@ -120,14 +121,14 @@ int32_t nnue_eval(const Network &network, const NnueAccumulator &stm, const Nnue
 	for (int i = 0; i < NNUE_L3_SIZE; i++) {
 		float value = network.l2_biases[output_bucket][i];
 		for (int j = 0; j < NNUE_L2_SIZE; j++)
-			value += l2[j] * network.l2_weights[output_bucket][j][i];
+			value = std::fma(l2[j], network.l2_weights[output_bucket][j][i], value);
 		l3[i] = value;
 	}
 
 	float score = network.output_biases[output_bucket];
 	for (int i = 0; i < NNUE_L3_SIZE; i++) {
 		float value = std::clamp(l3[i], 0.0f, 1.0f);
-		score += value * value * network.output_weights[output_bucket][i];
+		score = std::fma(value * value, network.output_weights[output_bucket][i], score);
 	}
 	return int32_t(score * NNUE_SCALE);
 }

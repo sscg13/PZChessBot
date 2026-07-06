@@ -86,8 +86,6 @@ $(EXE): $(OBJS)
 	@echo "Build complete. Run with ./$(EXE)"
 
 # Compile objects with dependency generation
-engine/nnue/network.o: CXXFLAGS += -ffp-contract=off
-
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
