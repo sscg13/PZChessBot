@@ -342,26 +342,33 @@ int main(int argc, char *argv[]) {
 		std::cout << "info string Pawn value: " << tot << std::endl;
 		return 0;
 	}
-	if (argc == 2 && std::string(argv[1]) == "avgeval") {
-		// assume book is at ./lichess-big3-resolved.txt
+	if (argc >= 2 && (std::string(argv[1]) == "evalscale" || std::string(argv[1]) == "avgeval")) {
+		std::string input_file = argc >= 3 ? argv[2] : "shatranj_unbalanced5.epd";
 		Position pos = Position();
-		std::ifstream bookfile("./lichess-big3-resolved.txt");
+		std::ifstream bookfile(input_file);
 		std::string line;
-		int64_t tot_eval = 0;
-		int npositions = 0;
+		uint64_t tot_eval = 0;
+		uint64_t npositions = 0;
 		if (!bookfile.is_open()) {
-			std::cerr << "Could not open book file" << std::endl;
+			std::cerr << "Could not open evalscale file: " << input_file << std::endl;
 			return 1;
 		}
 		while (getline(bookfile, line)) {
-			std::string fen = line.substr(0, line.find(' '));
-			pos.reset(fen);
-			Value score = abs(eval(pos));
-			tot_eval += score;
+			if (line.empty() || line[0] == '#')
+				continue;
+			// Position::reset consumes the four EPD position fields and ignores
+			// any following operations, scores, or result annotations.
+			pos.reset(line);
+			tot_eval += std::abs(int(eval(pos)));
 			npositions++;
 		}
 		bookfile.close();
-		std::cout << "info string Average eval over " << npositions << " positions: " << (tot_eval / npositions) << std::endl;
+		if (!npositions) {
+			std::cerr << "No positions found in evalscale file: " << input_file << std::endl;
+			return 1;
+		}
+		std::cout << "info string Total absolute eval " << tot_eval << " over " << npositions << " positions" << std::endl;
+		std::cout << "info string Average absolute eval: " << (tot_eval / npositions) << std::endl;
 		return 0;
 	}
 	std::cout << "PZShatranjBot " << VERSION << " developed by kevlu8 and wdotmathree" << std::endl;

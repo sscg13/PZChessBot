@@ -9,7 +9,7 @@
  *
  * PZShatranjBot is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
@@ -18,32 +18,46 @@
 
 #include "eval.hpp"
 
-// Adapted from Prolix's MIT-licensed PRF evaluator by Chris Bao.
-// See LICENSES/Prolix.txt.
+#include <algorithm>
+#include <cstdlib>
+
+Network nnue_network;
+
+__attribute__((constructor)) void init_network() {
+	nnue_network.load();
+}
+
 namespace {
-constexpr int FileTable[6][8] = {
-	{40, 77, 75, 79, 99, 78, 76, 41},
-	{91, 65, 103, 69, 79, 92, 64, 64},
-	{73, 110, 109, 127, 122, 122, 100, 76},
-	{418, 437, 453, 456, 454, 444, 423, 400},
-	{726, 742, 737, 741, 737, 743, 737, 743},
-	{-24, -2, -1, 3, 1, 9, 6, -2},
-};
+void refresh_accumulators(const Position &pos, NnueAccumulator &white, NnueAccumulator &black) {
+	std::copy(std::begin(nnue_network.accumulator_biases), std::end(nnue_network.accumulator_biases), white.values);
+	std::copy(std::begin(nnue_network.accumulator_biases), std::end(nnue_network.accumulator_biases), black.values);
 
-constexpr int RankTable[6][8] = {
-	{0, 50, 68, 64, 67, 61, 88, 0},
-	{57, 0, 89, 0, 72, 0, 57, 0},
-	{52, 62, 112, 124, 120, 94, 94, 71},
-	{392, 406, 435, 449, 454, 470, 409, 349},
-	{717, 714, 699, 717, 742, 751, 763, 778},
-	{-18, -23, -4, 17, 24, 8, 5, -27},
-};
+	Square white_king = Square(arch::tzcnt(pos.piece_boards[KING] & pos.piece_boards[OCC(WHITE)]));
+	Square black_king = Square(arch::tzcnt(pos.piece_boards[KING] & pos.piece_boards[OCC(BLACK)]));
+	int white_bucket = NNUE_KING_BUCKETS[white_king];
+	int black_bucket = NNUE_KING_BUCKETS[black_king ^ 56];
 
-constexpr int Tempo = 3;
+	for (int square = 0; square < 64; square++) {
+		Piece piece = pos.mailbox[square];
+		if (piece == NO_PIECE)
+			continue;
+		PieceType type = PieceType(piece & 7);
+		bool side = piece >> 3;
+		int white_index = nnue_index(Square(square), type, side, false, white_bucket);
+		int black_index = nnue_index(Square(square), type, side, true, black_bucket);
+		for (int i = 0; i < NNUE_ACCUMULATOR_SIZE; i++) {
+			white.values[i] += nnue_network.accumulator_weights[white_index][i];
+			black.values[i] += nnue_network.accumulator_weights[black_index][i];
+		}
+	}
+}
 
-constexpr int piece_square(PieceType piece, Square square, bool color) {
-	int relative_square = color == WHITE ? square : (square ^ 56);
-	return RankTable[piece][relative_square >> 3] + FileTable[piece][relative_square & 7];
+Value evaluate_bucket(Position &pos, int bucket) {
+	NnueAccumulator white, black;
+	refresh_accumulators(pos, white, black);
+	if (pos.side == WHITE)
+		return Value(nnue_eval(nnue_network, white, black, bucket));
+	return Value(-nnue_eval(nnue_network, black, white, bucket));
 }
 } // namespace
 
@@ -57,38 +71,25 @@ Value simple_eval(Position &pos) {
 }
 
 Value eval(Position &pos) {
-	int score = 0;
-	for (int color = WHITE; color <= BLACK; color++) {
-		Bitboard pieces = pos.piece_boards[OCC(color)];
-		while (pieces) {
-			Square square = Square(arch::tzcnt(pieces));
-			PieceType piece = PieceType(pos.mailbox[square] & 7);
-			int value = piece_square(piece, square, color);
-			score += color == WHITE ? value : -value;
-			pieces = arch::blsr(pieces);
-		}
-	}
-	return Value(score + (pos.side == WHITE ? Tempo : -Tempo));
+	int pieces = arch::popcnt(pos.piece_boards[OCC(WHITE)] | pos.piece_boards[OCC(BLACK)]);
+	int bucket = std::clamp((pieces - 2) / 4, 0, NNUE_OUTPUT_BUCKETS - 1);
+	return evaluate_bucket(pos, bucket);
 }
 
 std::array<Value, 8> debug_eval(Position &pos) {
-	if (!(pos.piece_boards[KING] & pos.piece_boards[OCC(BLACK)])) {
-		// If black has no king, this is mate for white
+	if (!(pos.piece_boards[KING] & pos.piece_boards[OCC(BLACK)]))
 		return {VALUE_MATE, 0, 0, 0, 0, 0, 0, 0};
-	}
-	if (!(pos.piece_boards[KING] & pos.piece_boards[OCC(WHITE)])) {
-		// Likewise, if white has no king, this is mate for black
+	if (!(pos.piece_boards[KING] & pos.piece_boards[OCC(WHITE)]))
 		return {-VALUE_MATE, 0, 0, 0, 0, 0, 0, 0};
-	}
-	if (pos.halfmove >= 140)
-		return {0, 0, 0, 0, 0, 0, 0, 0}; // Draw by 70 moves
-	if (pos.two_kings())
+	if (pos.halfmove >= 140 || pos.two_kings())
 		return {0, 0, 0, 0, 0, 0, 0, 0};
 	if (pos.bare_king(!pos.side)) {
 		Value result = pos.side == WHITE ? VALUE_MATE : -VALUE_MATE;
 		return {result, 0, 0, 0, 0, 0, 0, 0};
 	}
 
-	Value score = eval(pos);
-	return {score, score, score, score, score, score, score, score};
+	std::array<Value, 8> scores{};
+	for (int bucket = 0; bucket < NNUE_OUTPUT_BUCKETS; bucket++)
+		scores[bucket] = evaluate_bucket(pos, bucket);
+	return scores;
 }

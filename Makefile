@@ -1,5 +1,6 @@
 # Project settings
 EXE				?= pzshatranjbot
+EVALFILE		?= pzshatranj1.nnue
 GIT_SHORT_HASH	:= $(shell git rev-parse --short HEAD)
 GIT_DATE		:= $(shell git log -1 --format=%cd --date=format:"%Y%m%d")
 
@@ -9,7 +10,7 @@ VERSION			:= v$(GIT_DATE)-$(GIT_SHORT_HASH)-dev
 CXX	?= g++
 
 # Flags
-BASEFLAGS   := -std=c++20 -DVERSION=\"$(VERSION)\"
+BASEFLAGS   := -std=c++20 -DNNUE_PATH=\"$(EVALFILE)\" -DVERSION=\"$(VERSION)\"
 OPTFLAGS    := -O3 -flto=auto
 DEBUGFLAGS  := -g -march=x86-64-v3 -fsanitize=address,undefined
 LDFLAGS		:=
@@ -85,6 +86,8 @@ $(EXE): $(OBJS)
 	@echo "Build complete. Run with ./$(EXE)"
 
 # Compile objects with dependency generation
+engine/nnue/network.o: CXXFLAGS += -ffp-contract=off
+
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
