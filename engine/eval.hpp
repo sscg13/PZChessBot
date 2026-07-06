@@ -20,6 +20,7 @@
 
 #include "bitboard.hpp"
 #include "includes.hpp"
+#include "nnue/network.hpp"
 
 Value simple_eval(Position &);
 
