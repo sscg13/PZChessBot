@@ -1,6 +1,6 @@
 # Project settings
 EXE				?= pzshatranjbot
-EVALFILE		?= pzshatranj1.nnue
+EVALFILE		?= pzshatranj2.nnue
 GIT_SHORT_HASH	:= $(shell git rev-parse --short HEAD)
 GIT_DATE		:= $(shell git log -1 --format=%cd --date=format:"%Y%m%d")
 
