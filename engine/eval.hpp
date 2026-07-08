@@ -20,10 +20,13 @@
 
 #include "bitboard.hpp"
 #include "includes.hpp"
+#include "nnue/accumulator.hpp"
 #include "nnue/network.hpp"
 
 Value simple_eval(Position &);
 
 Value eval(Position &pos);
+
+Value eval(Position &pos, AccumulatorManager &accumulators);
 
 std::array<Value, 8> debug_eval(Position &pos);

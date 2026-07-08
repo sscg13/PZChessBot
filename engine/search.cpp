@@ -281,7 +281,7 @@ Value quiesce(Position &pos, ThreadInfo &ti, Value alpha, Value beta, int side, 
 	}
 
 	if (ply >= MAX_PLY)
-		return eval(pos) * side; // Just in case
+		return eval(pos, ti.accumulators) * side; // Just in case
 
 	// Check for TTable cutoff
 	auto tentry = ttable.probe(pos.zobrist);
@@ -307,7 +307,7 @@ Value quiesce(Position &pos, ThreadInfo &ti, Value alpha, Value beta, int side, 
 	Value stand_pat = -VALUE_INFINITE;
 	Value raw_eval = -VALUE_INFINITE;
 	if (!in_check) {
-		stand_pat = tentry && is_valid_score(tentry->s_eval) ? tentry->s_eval : eval(pos) * side;
+		stand_pat = tentry && is_valid_score(tentry->s_eval) ? tentry->s_eval : eval(pos, ti.accumulators) * side;
 		raw_eval = stand_pat;
 		ti.thread_corrhist.apply_correction(pos, ti.ss, ply, stand_pat);
 		if (tentry && is_valid_score(tteval) && abs(tteval) < VALUE_WIN && tentry->bound() != (tteval > stand_pat ? UPPER_BOUND : LOWER_BOUND))
@@ -375,12 +375,14 @@ Value quiesce(Position &pos, ThreadInfo &ti, Value alpha, Value beta, int side, 
 		Position pos_after = pos;
 		pos_after.make_move(move);
 		rp.push_hash(pos_after.zobrist);
+		ti.accumulators.make_move(pos, move, pos_after);
 		ti.ss++;
 
 		arch::prefetch(&ttable.TT[pos_after.zobrist & (ttable.TT_SIZE - 1)]);
 		Value score = -quiesce(pos_after, ti, -beta, -alpha, -side, ply + 1, pv);
 
 		ti.ss--;
+		ti.accumulators.pop_move();
 		rp.pop_hash();
 
 		ti.ss->move = NullMove;
@@ -435,7 +437,7 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 	RepetitionHandler &rp = ti.rp;
 
 	if (ply >= MAX_PLY)
-		return eval(pos) * side;
+		return eval(pos, ti.accumulators) * side;
 
 	if (pv) {
 		ti.pvlen[ply] = 0;
@@ -534,7 +536,7 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 	Value tt_corr_eval = 0;
 	Value corr_val = 0;
 	if (!in_check) {
-		cur_eval = tentry && is_valid_score(tentry->s_eval) ? tentry->s_eval : eval(pos) * side;
+		cur_eval = tentry && is_valid_score(tentry->s_eval) ? tentry->s_eval : eval(pos, ti.accumulators) * side;
 		raw_eval = cur_eval;
 		if (!excluded)
 			ti.thread_corrhist.apply_correction(pos, ti.ss, ply, cur_eval);
@@ -668,6 +670,7 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 			Position pos_after = pos;
 			pos_after.make_move(pc_move);
 			rp.push_hash(pos_after.zobrist);
+			ti.accumulators.make_move(pos, pc_move, pos_after);
 			ti.ss++;
 
 			arch::prefetch(&ttable.TT[pos_after.zobrist & (ttable.TT_SIZE - 1)]);
@@ -677,6 +680,7 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 				score = -negamax<false>(pos_after, ti, pc_depth, -pc_beta, -pc_beta + 1, -side, !cutnode, ply + 1);
 
 			ti.ss--;
+			ti.accumulators.pop_move();
 			rp.pop_hash();
 
 			ti.ss->move = NullMove;
@@ -859,6 +863,7 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 		Position pos_after = pos;
 		pos_after.make_move(move);
 		rp.push_hash(pos_after.zobrist);
+		ti.accumulators.make_move(pos, move, pos_after);
 		ti.ss++;
 
 		arch::prefetch(&ttable.TT[pos_after.zobrist & (ttable.TT_SIZE - 1)]);
@@ -944,6 +949,7 @@ Value negamax(Position &pos, ThreadInfo &ti, int depth, Value alpha = -VALUE_INF
 		}
 
 		ti.ss--;
+		ti.accumulators.pop_move();
 		rp.pop_hash();
 
 		ti.ss->move = NullMove;
@@ -1056,7 +1062,7 @@ void iterativedeepening(Position &pos, ThreadInfo &ti, int depth) {
 
 	depth = std::min(depth, MAX_PLY - 1);
 
-	Value static_eval = eval(pos) * (pos.side ? -1 : 1);
+	Value static_eval = eval(pos, ti.accumulators) * (pos.side ? -1 : 1);
 	int consec_move = 0;
 
 	Move best_move = NullMove;
