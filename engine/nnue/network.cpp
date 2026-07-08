@@ -30,7 +30,7 @@ extern "C" {
 }
 
 namespace {
-constexpr size_t NETWORK_FILE_SIZE =
+constexpr size_t NETWORK_DATA_SIZE =
 	NNUE_INPUT_BUCKETS * NNUE_INPUT_SIZE * NNUE_ACCUMULATOR_SIZE * sizeof(int16_t)
 	+ NNUE_ACCUMULATOR_SIZE * sizeof(int16_t)
 	+ NNUE_OUTPUT_BUCKETS * NNUE_L2_SIZE * NNUE_ACCUMULATOR_SIZE * sizeof(int8_t)
@@ -39,6 +39,7 @@ constexpr size_t NETWORK_FILE_SIZE =
 	+ NNUE_OUTPUT_BUCKETS * NNUE_L3_SIZE * sizeof(float)
 	+ NNUE_OUTPUT_BUCKETS * NNUE_L3_SIZE * sizeof(float)
 	+ NNUE_OUTPUT_BUCKETS * sizeof(float);
+constexpr size_t NETWORK_PADDED_SIZE = (NETWORK_DATA_SIZE + 63) & ~size_t(63);
 
 // Bullet writes piece planes in chess order (P, N, B, R, Q, K), while the
 // engine indexes them in shatranj order (P, A, F, N, R, K). This is the same
@@ -47,9 +48,10 @@ constexpr int NET_TO_SHATRANJ_PIECE[12] = {0, 3, 1, 4, 2, 5, 6, 9, 7, 10, 8, 11}
 } // namespace
 
 void Network::load() {
-	if (gnetwork_weightsSize != NETWORK_FILE_SIZE) {
+	if (gnetwork_weightsSize != NETWORK_DATA_SIZE && gnetwork_weightsSize != NETWORK_PADDED_SIZE) {
 		std::cerr << "Invalid embedded NNUE size for " << NNUE_PATH << ": expected "
-		          << NETWORK_FILE_SIZE << " bytes, got " << gnetwork_weightsSize << std::endl;
+		          << NETWORK_DATA_SIZE << " bytes or " << NETWORK_PADDED_SIZE
+		          << " bytes with alignment padding, got " << gnetwork_weightsSize << std::endl;
 		std::abort();
 	}
 

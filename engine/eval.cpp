@@ -28,36 +28,19 @@ __attribute__((constructor)) void init_network() {
 }
 
 namespace {
-void refresh_accumulators(const Position &pos, NnueAccumulator &white, NnueAccumulator &black) {
-	std::copy(std::begin(nnue_network.accumulator_biases), std::end(nnue_network.accumulator_biases), white.values);
-	std::copy(std::begin(nnue_network.accumulator_biases), std::end(nnue_network.accumulator_biases), black.values);
-
-	Square white_king = Square(arch::tzcnt(pos.piece_boards[KING] & pos.piece_boards[OCC(WHITE)]));
-	Square black_king = Square(arch::tzcnt(pos.piece_boards[KING] & pos.piece_boards[OCC(BLACK)]));
-	int white_bucket = NNUE_KING_BUCKETS[white_king];
-	int black_bucket = NNUE_KING_BUCKETS[black_king ^ 56];
-
-	for (int square = 0; square < 64; square++) {
-		Piece piece = pos.mailbox[square];
-		if (piece == NO_PIECE)
-			continue;
-		PieceType type = PieceType(piece & 7);
-		bool side = piece >> 3;
-		int white_index = nnue_index(Square(square), type, side, false, white_bucket);
-		int black_index = nnue_index(Square(square), type, side, true, black_bucket);
-		for (int i = 0; i < NNUE_ACCUMULATOR_SIZE; i++) {
-			white.values[i] += nnue_network.accumulator_weights[white_index][i];
-			black.values[i] += nnue_network.accumulator_weights[black_index][i];
-		}
-	}
-}
-
-Value evaluate_bucket(Position &pos, int bucket) {
-	NnueAccumulator white, black;
-	refresh_accumulators(pos, white, black);
+Value evaluate_bucket(Position &pos, AccumulatorManager &accumulators, int bucket) {
+	accumulators.apply_lazy(pos);
+	const auto &pair = accumulators.current();
+#ifdef NNUE_ACCUMULATOR_CHECK
+	AccumulatorManager reference(pos);
+	const auto &expected = reference.current();
+	if (!std::equal(std::begin(pair.white.values), std::end(pair.white.values), std::begin(expected.white.values)) ||
+	    !std::equal(std::begin(pair.black.values), std::end(pair.black.values), std::begin(expected.black.values)))
+		std::abort();
+#endif
 	if (pos.side == WHITE)
-		return Value(nnue_eval(nnue_network, white, black, bucket));
-	return Value(-nnue_eval(nnue_network, black, white, bucket));
+		return Value(nnue_eval(nnue_network, pair.white, pair.black, bucket));
+	return Value(-nnue_eval(nnue_network, pair.black, pair.white, bucket));
 }
 } // namespace
 
@@ -71,9 +54,14 @@ Value simple_eval(Position &pos) {
 }
 
 Value eval(Position &pos) {
+	AccumulatorManager accumulators(pos);
+	return eval(pos, accumulators);
+}
+
+Value eval(Position &pos, AccumulatorManager &accumulators) {
 	int pieces = arch::popcnt(pos.piece_boards[OCC(WHITE)] | pos.piece_boards[OCC(BLACK)]);
 	int bucket = std::clamp((pieces - 2) / 4, 0, NNUE_OUTPUT_BUCKETS - 1);
-	return evaluate_bucket(pos, bucket);
+	return evaluate_bucket(pos, accumulators, bucket);
 }
 
 std::array<Value, 8> debug_eval(Position &pos) {
@@ -89,7 +77,8 @@ std::array<Value, 8> debug_eval(Position &pos) {
 	}
 
 	std::array<Value, 8> scores{};
+	AccumulatorManager accumulators(pos);
 	for (int bucket = 0; bucket < NNUE_OUTPUT_BUCKETS; bucket++)
-		scores[bucket] = evaluate_bucket(pos, bucket);
+		scores[bucket] = evaluate_bucket(pos, accumulators, bucket);
 	return scores;
 }

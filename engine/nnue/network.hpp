@@ -22,7 +22,7 @@
 
 constexpr int NNUE_INPUT_SIZE = 768;
 constexpr int NNUE_INPUT_BUCKETS = 1;
-constexpr int NNUE_ACCUMULATOR_SIZE = 16;
+constexpr int NNUE_ACCUMULATOR_SIZE = 32;
 constexpr int NNUE_L2_SIZE = 16;
 constexpr int NNUE_L3_SIZE = 32;
 constexpr int NNUE_OUTPUT_BUCKETS = 8;

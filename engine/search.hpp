@@ -97,9 +97,10 @@ struct alignas(4096) ThreadInfo {
 	alignas(64) Corrhist thread_corrhist;
 	Move pvtable[MAX_PLY + 5][MAX_PLY + 5];
 	int pvlen[MAX_PLY + 5] = {};
+	AccumulatorManager accumulators;
 	bool nmp_disable = false;
 
-	ThreadInfo() {
+	ThreadInfo() : accumulators(pos) {
 		ss = (new SSEntry[MAX_PLY + 16]) + 8;
 	}
 
